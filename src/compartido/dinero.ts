@@ -35,3 +35,17 @@ export function leerPesos(texto: string): number | null {
 export function pesosParaCampo(centavos: number): string {
   return numero(centavos);
 }
+
+/**
+ * Pesos "cortos" para ejes y etiquetas de gráficos: $ 900 · $ 12 mil · $ 1,2 M.
+ * (En las tablas y totales se usa siempre pesos(), con el número completo.)
+ */
+export function pesosCortos(centavos: number): string {
+  const p = Math.round(centavos / 100);
+  const signo = p < 0 ? '-' : '';
+  const a = Math.abs(p);
+  const decimal = (n: number) => n.toLocaleString('es-AR', { maximumFractionDigits: n < 10 ? 1 : 0 });
+  if (a >= 1_000_000) return `${signo}$ ${decimal(a / 1_000_000)} M`;
+  if (a >= 10_000) return `${signo}$ ${decimal(a / 1_000)} mil`;
+  return pesos(p * 100);
+}

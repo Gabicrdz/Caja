@@ -236,3 +236,43 @@ export const esquemaCerrarCaja = z.object({
   nota: textoOpcional(140),
 });
 export type DatosCerrarCaja = z.input<typeof esquemaCerrarCaja>;
+
+// ---------- Clientes ----------
+/** Solo los números: así "370 455-6677" y "3704556677" son el mismo teléfono. */
+export function claveTelefono(telefono: string): string {
+  return telefono.replace(/\D/g, '');
+}
+/** Un teléfono "sirve" para identificar a un cliente si tiene al menos 6 números. */
+export const MINIMO_TELEFONO = 6;
+
+export const esquemaCliente = z.object({
+  id,
+  nombre: textoOpcional(60),
+  telefono: z
+    .string()
+    .trim()
+    .max(30, 'Teléfono: máximo 30 caracteres.')
+    .refine((t) => claveTelefono(t).length >= MINIMO_TELEFONO, 'El teléfono tiene que tener al menos 6 números.'),
+  direccion: textoOpcional(120),
+  nota: textoOpcional(120),
+});
+export type DatosCliente = z.input<typeof esquemaCliente>;
+
+export const esquemaBusqueda = z.string().trim().max(60);
+export const esquemaListarClientes = z.object({
+  texto: esquemaBusqueda.default(''),
+  orden: z.enum(['reciente', 'pedidos', 'gastado']).default('reciente'),
+});
+export type DatosListarClientes = z.input<typeof esquemaListarClientes>;
+
+// ---------- Reportes ----------
+/** Como mucho un año por consulta (más que eso se vuelve lento y no se lee). */
+export const MAXIMO_DIAS_REPORTE = 366;
+export const esquemaRango = z
+  .object({ desde: esquemaFecha, hasta: esquemaFecha })
+  .refine((r) => r.desde <= r.hasta, { message: 'La fecha "desde" tiene que ser anterior a "hasta".', path: ['hasta'] })
+  .refine(
+    (r) => (new Date(`${r.hasta}T12:00:00`).getTime() - new Date(`${r.desde}T12:00:00`).getTime()) / 86_400_000 < MAXIMO_DIAS_REPORTE,
+    { message: `Elegí un período de hasta ${MAXIMO_DIAS_REPORTE} días.`, path: ['hasta'] },
+  );
+export type DatosRango = z.input<typeof esquemaRango>;

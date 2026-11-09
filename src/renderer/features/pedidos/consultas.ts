@@ -25,6 +25,8 @@ function useRefrescar() {
       cliente.invalidateQueries({ queryKey: CLAVE_PEDIDOS }),
       cliente.invalidateQueries({ queryKey: CLAVE_RESUMEN }),
       cliente.invalidateQueries({ queryKey: ['caja'] }),
+      cliente.invalidateQueries({ queryKey: ['clientes'] }),
+      cliente.invalidateQueries({ queryKey: ['reportes'] }),
     ]);
 }
 

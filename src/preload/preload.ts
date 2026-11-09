@@ -54,6 +54,15 @@ const api: ApiCaja = {
     anular: (id, motivo) => pedir(CANALES.pedidoAnular, id, motivo),
     cobrar: (id, pagos) => pedir(CANALES.pedidoCobrar, id, pagos),
   },
+  clientes: {
+    buscar: (texto) => pedir(CANALES.clientesBuscar, texto),
+    listar: (filtro) => pedir(CANALES.clientesListar, filtro),
+    guardar: (datos) => pedir(CANALES.clientesGuardar, datos),
+    pedidos: (id) => pedir(CANALES.clientesPedidos, id),
+  },
+  reportes: {
+    obtener: (rango) => pedir(CANALES.reportesObtener, rango),
+  },
   impresion: {
     imprimir: (id, tipo) => pedir(CANALES.impresionImprimir, id, tipo),
     pdf: (id, tipo) => pedir(CANALES.impresionPdf, id, tipo),

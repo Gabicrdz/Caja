@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useCarrito, type ItemCarrito } from './carrito';
 import { Contador } from './dialogo-armar';
+import { SugerenciasCliente } from './sugerencias-cliente';
 import type { RenglonCalculado } from './totales';
 
 const ICONOS: Record<TipoPedido, LucideIcon> = {
@@ -158,8 +159,10 @@ function DatosDelPedido({ envioPorDefecto }: { envioPorDefecto: number }) {
   if (c.tipo === 'delivery') {
     return (
       <div className="grid grid-cols-2 gap-2">
-        <Input aria-label="Nombre del cliente" placeholder="Nombre" maxLength={60} value={c.clienteNombre} onChange={(e) => c.cambiarDatos({ clienteNombre: e.target.value })} />
+        {/* Primero el teléfono: con eso se encuentra al cliente si ya pidió */}
         <Input aria-label="Teléfono" placeholder="Teléfono" inputMode="tel" maxLength={30} value={c.clienteTelefono} onChange={(e) => c.cambiarDatos({ clienteTelefono: e.target.value })} />
+        <Input aria-label="Nombre del cliente" placeholder="Nombre" maxLength={60} value={c.clienteNombre} onChange={(e) => c.cambiarDatos({ clienteNombre: e.target.value })} />
+        <SugerenciasCliente />
         <Input aria-label="Dirección" placeholder="Dirección (obligatoria)" maxLength={120} className="col-span-2" value={c.clienteDireccion} onChange={(e) => c.cambiarDatos({ clienteDireccion: e.target.value })} />
         <CampoEnvio valor={c.envioCentavos ?? envioPorDefecto} alCambiar={(v) => c.cambiarDatos({ envioCentavos: v })} />
       </div>

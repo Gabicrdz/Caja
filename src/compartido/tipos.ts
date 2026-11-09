@@ -223,4 +223,70 @@ export interface Configuracion {
 }
 
 /** Toda respuesta del main tiene esta forma (igual que en los proyectos anteriores). */
+// ---------- Clientes (etapa 5) ----------
+export interface Cliente {
+  id: number;
+  nombre: string;
+  telefono: string;
+  direccion: string;
+  nota: string;
+  pedidos: number;
+  /** Lo que gastó en total (sin anulados). */
+  gastadoCentavos: number;
+  /** 'AAAA-MM-DD' del último pedido, o null si no tiene. */
+  ultimoPedido: string | null;
+}
+
+export interface PedidoDeCliente {
+  id: number;
+  numero: number;
+  fecha: string;
+  hora: string;
+  tipo: TipoPedido;
+  estado: EstadoPedido;
+  totalCentavos: number;
+  direccion: string;
+}
+
+// ---------- Reportes (etapa 5) ----------
+export interface VentasDelDia {
+  fecha: string;
+  pedidos: number;
+  ventasCentavos: number;
+}
+export interface VentasPorHora {
+  /** 0 a 23 */
+  hora: number;
+  pedidos: number;
+  ventasCentavos: number;
+}
+export interface VentasDeProducto {
+  productoId: number;
+  nombre: string;
+  categoria: string;
+  cantidad: number;
+  ventasCentavos: number;
+}
+export interface Reporte {
+  desde: string;
+  hasta: string;
+  dias: number;
+  /** Pedidos no anulados (cobrados y "a cobrar"). */
+  pedidos: number;
+  ventasCentavos: number;
+  ticketPromedioCentavos: number;
+  envioCentavos: number;
+  anulados: { cantidad: number; totalCentavos: number };
+  sinCobrar: { cantidad: number; totalCentavos: number };
+  /** El período anterior del mismo largo (para comparar). */
+  anterior: { desde: string; hasta: string; pedidos: number; ventasCentavos: number };
+  porDia: VentasDelDia[];
+  porHora: VentasPorHora[];
+  porMedio: { medio: MedioDePago; cobros: number; montoCentavos: number }[];
+  porTipo: { tipo: TipoPedido; pedidos: number; ventasCentavos: number }[];
+  porUsuario: { usuarioId: number | null; nombre: string; pedidos: number; ventasCentavos: number }[];
+  productos: VentasDeProducto[];
+  clientes: { conPedidos: number; nuevos: number };
+}
+
 export type Respuesta<T> = { ok: true; datos: T } | { ok: false; error: string };

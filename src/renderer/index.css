@@ -31,6 +31,10 @@
   --verde-suave: #e3f2ea;
   --rojo: #c1362b;
   --rojo-suave: #fbe8e6;
+  /* Gráficos: un mostaza más oscuro que el de los botones, para que las barras
+     se lean sobre blanco (contraste 3:1, validado). Al pasar el mouse, se aclara. */
+  --dato: #b98a00;
+  --dato-activo: #d9a300;
 
   /* Nombres que esperan los componentes de shadcn/ui */
   --background: var(--fondo);
@@ -95,6 +99,8 @@
   --color-verde-suave: var(--verde-suave);
   --color-rojo: var(--rojo);
   --color-rojo-suave: var(--rojo-suave);
+  --color-dato: var(--dato);
+  --color-dato-activo: var(--dato-activo);
 }
 
 @layer base {

@@ -12,7 +12,7 @@ describe('base de datos', () => {
   it('esquema.ts (Drizzle) coincide con las tablas que crean las migraciones', () => {
     const db = baseNueva();
     const tablas = (Object.values(esquema) as unknown[]).filter((t): t is SQLiteTable => is(t, SQLiteTable));
-    expect(tablas.length).toBe(14);
+    expect(tablas.length).toBe(15);
     for (const tabla of tablas) {
       const config = getTableConfig(tabla);
       const enLaBase = (

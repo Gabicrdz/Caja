@@ -18,6 +18,7 @@ import { ErrorDeUsuario } from './errores';
 import { obtenerMenu } from './menu';
 import { fechaLocal, horaLocal } from './fechas';
 import { cajaAbierta } from './caja';
+import { registrarClienteDePedido } from './clientes';
 
 type PedidoValidado = z.output<typeof esquemaPedido>;
 type PagosValidados = z.output<typeof esquemaPagos>;
@@ -120,6 +121,16 @@ export function crearPedido(
       .where(eq(pedidos.fecha, fecha))
       .get()!;
     const numero = Number(siguiente);
+    // Si trae teléfono, el cliente queda agendado (o se actualiza su dirección).
+    const clienteId = registrarClienteDePedido(
+      tx,
+      {
+        telefono: datos.clienteTelefono,
+        nombre: datos.clienteNombre,
+        direccion: datos.tipo === 'delivery' ? datos.clienteDireccion : '',
+      },
+      ahora,
+    );
     const pedidoId = tx
       .insert(pedidos)
       .values({
@@ -137,6 +148,7 @@ export function crearPedido(
         totalCentavos,
         cobrado,
         usuarioId,
+        clienteId,
       })
       .returning({ id: pedidos.id })
       .get().id;

@@ -8,18 +8,22 @@ import { z, type ZodType } from 'zod';
 import { CANALES } from '@compartido/api';
 import {
   esquemaAbrirCaja,
+  esquemaBusqueda,
   esquemaCategoria,
   esquemaCerrarCaja,
+  esquemaCliente,
   esquemaEstado,
   esquemaFecha,
   esquemaGrupo,
   esquemaImpresion,
+  esquemaListarClientes,
   esquemaMotivo,
   esquemaMovimiento,
   esquemaPagos,
   esquemaPedido,
   esquemaPin,
   esquemaProducto,
+  esquemaRango,
   esquemaUsuario,
 } from '@compartido/esquemas';
 import type { Respuesta, Usuario } from '@compartido/tipos';
@@ -40,6 +44,8 @@ import { guardarImpresion, obtenerConfiguracion } from './servicios/configuracio
 import { darDeBajaUsuario, guardarUsuario, hayUsuarios, listarUsuarios } from './servicios/usuarios';
 import { cerrarSesion, iniciarSesion, requerir, sesionActual } from './servicios/sesion';
 import { abrirCaja, cajaAbierta, cerrarCaja, historialDeCajas, registrarMovimiento, resumenDeCaja } from './servicios/caja';
+import { buscarClientes, guardarCliente, listarClientes, pedidosDeCliente } from './servicios/clientes';
+import { obtenerReporte } from './servicios/reportes';
 import { htmlCierre, htmlImpresion } from './impresion/plantillas';
 import { guardarPdf, imprimirHtml, listarImpresoras } from './impresion/imprimir';
 
@@ -173,6 +179,18 @@ export function registrarCanales(info: () => { version: string; baseDeDatos: str
 
   // ── Pedidos ──
   manejar(CANALES.pedidoCrear, 'sesion', z.tuple([esquemaPedido]), (d, yo) => crearPedido(db(), d, new Date(), yo.id));
+  // ── Clientes (cualquiera con sesión: el cajero también corrige direcciones) ──
+  manejar(CANALES.clientesBuscar, 'sesion', z.tuple([esquemaBusqueda]), (texto) => buscarClientes(db(), texto));
+  manejar(CANALES.clientesListar, 'sesion', z.tuple([esquemaListarClientes]), (filtro) => listarClientes(db(), filtro));
+  manejar(CANALES.clientesGuardar, 'sesion', z.tuple([esquemaCliente]), (datos) => {
+    guardarCliente(db(), datos);
+    return null;
+  });
+  manejar(CANALES.clientesPedidos, 'sesion', z.tuple([id]), (clienteId) => pedidosDeCliente(db(), clienteId));
+
+  // ── Reportes (solo el dueño: muestra cuánto vende el local) ──
+  manejar(CANALES.reportesObtener, 'dueno', z.tuple([esquemaRango]), (rango) => obtenerReporte(db(), rango));
+
   manejar(CANALES.pedidoResumenHoy, 'sesion', nada, () => resumenDelDia(db()));
   manejar(CANALES.pedidoListar, 'sesion', z.tuple([esquemaFecha]), (fecha) => listarPedidos(db(), { fecha }));
   manejar(CANALES.pedidoEstado, 'sesion', z.tuple([id, esquemaEstado]), (pedidoId, estado) => {

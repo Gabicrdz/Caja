@@ -6,6 +6,7 @@ import {
   ReceiptText,
   Settings,
   ShoppingBag,
+  UsersRound,
   UtensilsCrossed,
   Wallet,
   type LucideIcon,
@@ -29,8 +30,10 @@ const SECCIONES: Seccion[] = [
   { ruta: '/pedidos', nombre: 'Pedidos', icono: ReceiptText },
   { ruta: '/caja', nombre: 'Caja', icono: Wallet },
   { ruta: '/menu', nombre: 'Menú', icono: UtensilsCrossed },
-  { ruta: '/reportes', nombre: 'Reportes', icono: ChartColumn, llegaEn: 'la etapa 5' },
+  { ruta: '/clientes', nombre: 'Clientes', icono: UsersRound },
 ];
+
+const REPORTES: Seccion = { ruta: '/reportes', nombre: 'Reportes', icono: ChartColumn };
 
 const AJUSTES: Seccion = { ruta: '/ajustes', nombre: 'Ajustes', icono: Settings };
 
@@ -134,6 +137,7 @@ export function Riel() {
       {SECCIONES.map((s) => (
         <Boton key={s.ruta} seccion={s} />
       ))}
+      <Boton seccion={esDueno ? REPORTES : { ...REPORTES, llegaEn: 'Solo el dueño' }} />
       <div className="mt-auto flex w-full flex-col items-center gap-4">
         <Boton seccion={esDueno ? AJUSTES : { ...AJUSTES, llegaEn: 'Solo el dueño' }} />
         <Atendiendo />

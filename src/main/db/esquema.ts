@@ -106,6 +106,7 @@ export const pedidos = sqliteTable('pedidos', {
   actualizadoEn: text('actualizado_en'),
   usuarioId: integer('usuario_id').references(() => usuarios.id),
   anuladoPor: integer('anulado_por').references(() => usuarios.id),
+  clienteId: integer('cliente_id').references(() => clientes.id),
 });
 
 export const pedidoItems = sqliteTable('pedido_items', {
@@ -192,4 +193,15 @@ export const movimientosCaja = sqliteTable('movimientos_caja', {
     .notNull()
     .references(() => usuarios.id),
   creadoEn: text('creado_en').notNull(),
+});
+
+export const clientes = sqliteTable('clientes', {
+  id: integer('id').primaryKey(),
+  telefonoClave: text('telefono_clave').notNull().unique(),
+  telefono: text('telefono').notNull(),
+  nombre: text('nombre').notNull().default(''),
+  direccion: text('direccion').notNull().default(''),
+  nota: text('nota').notNull().default(''),
+  creadoEn: text('creado_en').notNull().default(ahora),
+  actualizadoEn: text('actualizado_en').notNull().default(ahora),
 });

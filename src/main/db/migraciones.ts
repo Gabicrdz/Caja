@@ -218,4 +218,39 @@ export const MIGRACIONES: Migracion[] = [
       CREATE INDEX pagos_por_caja ON pagos (caja_id);
     `,
   },
+  {
+    nombre: 'Clientes (agenda de delivery) y pedidos asociados a cada cliente',
+    sql: /* sql */ `
+      CREATE TABLE clientes (
+        id              INTEGER PRIMARY KEY,
+        -- Solo los números del teléfono: "370 455-6677" y "3704556677" son el mismo cliente.
+        telefono_clave  TEXT    NOT NULL UNIQUE,
+        telefono        TEXT    NOT NULL,      -- como lo escribieron la última vez
+        nombre          TEXT    NOT NULL DEFAULT '',
+        direccion       TEXT    NOT NULL DEFAULT '',
+        nota            TEXT    NOT NULL DEFAULT '',  -- referencias: "portón verde", "tocar timbre 2"
+        creado_en       TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+        actualizado_en  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+      );
+
+      ALTER TABLE pedidos ADD COLUMN cliente_id INTEGER REFERENCES clientes (id);
+      CREATE INDEX pedidos_por_cliente ON pedidos (cliente_id);
+
+      -- Los pedidos que ya había con teléfono pasan a ser clientes (el dato más nuevo gana).
+      CREATE TEMP TABLE telefonos_viejos AS
+        SELECT id, fecha, hora, cliente_telefono, cliente_nombre, cliente_direccion,
+               replace(replace(replace(replace(replace(replace(cliente_telefono, ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '.', '') AS clave
+        FROM pedidos
+        WHERE cliente_telefono <> '';
+      INSERT INTO clientes (telefono_clave, telefono, nombre, direccion)
+        SELECT t.clave, t.cliente_telefono, t.cliente_nombre, t.cliente_direccion
+        FROM telefonos_viejos t
+        WHERE length(t.clave) >= 6
+          AND t.id = (SELECT t2.id FROM telefonos_viejos t2 WHERE t2.clave = t.clave ORDER BY t2.fecha DESC, t2.hora DESC, t2.id DESC LIMIT 1);
+      UPDATE pedidos SET cliente_id = (
+        SELECT c.id FROM telefonos_viejos t JOIN clientes c ON c.telefono_clave = t.clave WHERE t.id = pedidos.id
+      ) WHERE cliente_telefono <> '';
+      DROP TABLE telefonos_viejos;
+    `,
+  },
 ];

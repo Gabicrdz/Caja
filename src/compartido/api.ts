@@ -3,6 +3,9 @@
 import type {
   DatosCategoria,
   DatosCerrarCaja,
+  DatosCliente,
+  DatosListarClientes,
+  DatosRango,
   DatosGrupo,
   DatosImpresion,
   DatosMovimiento,
@@ -13,12 +16,15 @@ import type {
 } from './esquemas';
 import type {
   Caja,
+  Cliente,
   Configuracion,
   EstadoPedido,
   Impresora,
   Menu,
   PedidoCreado,
   PedidoDetalle,
+  PedidoDeCliente,
+  Reporte,
   Respuesta,
   ResumenCaja,
   ResumenDelDia,
@@ -79,6 +85,17 @@ export interface ApiCaja {
     anular(id: number, motivo: string): Promise<Respuesta<null>>;
     cobrar(id: number, pagos: DatosPagos): Promise<Respuesta<PedidoCreado>>;
   };
+  clientes: {
+    /** Para el delivery: hasta 6 clientes que coinciden por teléfono o nombre. */
+    buscar(texto: string): Promise<Respuesta<Cliente[]>>;
+    listar(filtro: DatosListarClientes): Promise<Respuesta<Cliente[]>>;
+    guardar(datos: DatosCliente): Promise<Respuesta<null>>;
+    pedidos(id: number): Promise<Respuesta<PedidoDeCliente[]>>;
+  };
+  reportes: {
+    /** Solo el dueño. Fechas 'AAAA-MM-DD', las dos incluidas. */
+    obtener(rango: DatosRango): Promise<Respuesta<Reporte>>;
+  };
   impresion: {
     /** id = pedido (comanda, ticket) o caja (cierre). impreso = false si se canceló el diálogo. */
     imprimir(id: number, tipo: TipoImpresion): Promise<Respuesta<{ impreso: boolean }>>;
@@ -129,6 +146,11 @@ export const CANALES = {
   pedidoEstado: 'pedidos:estado',
   pedidoAnular: 'pedidos:anular',
   pedidoCobrar: 'pedidos:cobrar',
+  clientesBuscar: 'clientes:buscar',
+  clientesListar: 'clientes:listar',
+  clientesGuardar: 'clientes:guardar',
+  clientesPedidos: 'clientes:pedidos',
+  reportesObtener: 'reportes:obtener',
   impresionImprimir: 'impresion:imprimir',
   impresionPdf: 'impresion:pdf',
   impresionImpresoras: 'impresion:impresoras',
