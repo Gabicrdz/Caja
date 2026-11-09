@@ -11,6 +11,7 @@ import {
   esquemaGrupo,
   esquemaId,
   esquemaMoverCategoria,
+  esquemaPedido,
   esquemaProducto,
 } from '@compartido/esquemas';
 import type { Respuesta } from '@compartido/tipos';
@@ -18,6 +19,8 @@ import { obtenerDb } from './db/conexion';
 import { ErrorDeUsuario } from './servicios/errores';
 import * as menu from './servicios/menu';
 import { cargarMenuDeEjemplo } from './servicios/menu-ejemplo';
+import { crearPedido, resumenDelDia } from './servicios/pedidos';
+import { obtenerConfiguracion } from './servicios/configuracion';
 
 /** Convierte cualquier error en un mensaje para la ventana. */
 export function mensajeDeError(error: unknown): string {
@@ -111,6 +114,10 @@ export function registrarCanales(info: () => { version: string; baseDeDatos: str
     menu.darDeBajaGrupo(db(), esquemaId.parse({ id }).id);
     return null;
   });
+
+  manejar(CANALES.pedidoCrear, z.tuple([esquemaPedido]), (d) => crearPedido(db(), d));
+  manejar(CANALES.pedidoResumenHoy, sinArgumentos, () => resumenDelDia(db()));
+  manejar(CANALES.configuracionObtener, sinArgumentos, () => obtenerConfiguracion(db()));
 
   manejar(CANALES.sistemaInfo, sinArgumentos, info);
 }

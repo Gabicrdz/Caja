@@ -290,7 +290,17 @@ describe('menú de ejemplo', () => {
       'Cerveza lata 473 ml',
       'Helado',
     ]);
-    expect(() => cargarMenuDeEjemplo(db)).toThrow('ya tiene datos');
+    expect(() => cargarMenuDeEjemplo(db)).toThrow('ya tiene productos');
+  });
+
+  it('con categorías creadas pero sin productos, las reutiliza', () => {
+    const pizzas = menu.crearCategoria(db, 'pizzas');
+    menu.crearCategoria(db, 'Combos');
+    cargarMenuDeEjemplo(db);
+    const m = menu.obtenerMenu(db);
+    expect(m.categorias.map((c) => c.nombre)).toEqual(['pizzas', 'Combos', 'Hamburguesas', 'Lomitos y sándwiches', 'Empanadas', 'Minutas', 'Bebidas', 'Cafetería', 'Postres']);
+    expect(m.productos.filter((p) => p.categoriaId === pizzas)).toHaveLength(3);
+    expect(m.productos).toHaveLength(24);
   });
 
   it('si algo falla a la mitad, no queda nada cargado (transacción)', () => {

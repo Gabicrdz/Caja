@@ -3,8 +3,9 @@
 // el botón "Cargar menú de ejemplo" cuando el menú está vacío.
 import type { BaseDeDatos } from '../db/conexion';
 import { ErrorDeUsuario } from './errores';
+import { and, eq, sql } from 'drizzle-orm';
 import { crearCategoria, guardarGrupo, guardarProducto } from './menu';
-import { categorias } from '../db/esquema';
+import { categorias, gruposAgregados, productos } from '../db/esquema';
 
 const $ = (pesos: number) => Math.round(pesos * 100);
 
@@ -125,26 +126,48 @@ const MENU: [string, ProductoEjemplo[]][] = [
   ],
 ];
 
+/**
+ * Se puede cargar mientras no haya PRODUCTOS. Si ya existen categorías o
+ * grupos con el mismo nombre (por ejemplo "Pizzas"), se reutilizan en vez
+ * de duplicarlos.
+ */
 export function cargarMenuDeEjemplo(db: BaseDeDatos): void {
-  const hayCategorias = db.select({ id: categorias.id }).from(categorias).limit(1).get();
-  if (hayCategorias) {
-    throw new ErrorDeUsuario('El menú ya tiene datos. El ejemplo solo se carga en un menú vacío.');
+  const hayProductos = db
+    .select({ id: productos.id })
+    .from(productos)
+    .where(eq(productos.activo, true))
+    .limit(1)
+    .get();
+  if (hayProductos) {
+    throw new ErrorDeUsuario('El menú ya tiene productos. El ejemplo solo se carga en un menú sin productos.');
   }
   db.transaction(() => {
     const ids = new Map<ClaveGrupo, number>();
     for (const g of GRUPOS) {
+      const existente = db
+        .select({ id: gruposAgregados.id })
+        .from(gruposAgregados)
+        .where(and(eq(gruposAgregados.activo, true), sql`${gruposAgregados.nombre} = ${g.nombre} COLLATE NOCASE`))
+        .get();
       ids.set(
         g.clave,
-        guardarGrupo(db, {
-          nombre: g.nombre,
-          minimo: g.minimo,
-          maximo: g.maximo,
-          opciones: g.opciones.map(([nombre, precio]) => ({ nombre, precioCentavos: $(precio) })),
-        }),
+        existente?.id ??
+          guardarGrupo(db, {
+            nombre: g.nombre,
+            minimo: g.minimo,
+            maximo: g.maximo,
+            opciones: g.opciones.map(([nombre, precio]) => ({ nombre, precioCentavos: $(precio) })),
+          }),
       );
     }
     for (const [nombreCategoria, lista] of MENU) {
-      const categoriaId = crearCategoria(db, nombreCategoria);
+      const existente = db
+        .select({ id: categorias.id })
+        .from(categorias)
+        .where(sql`${categorias.nombre} = ${nombreCategoria} COLLATE NOCASE`)
+        .get();
+      if (existente) db.update(categorias).set({ activa: true }).where(eq(categorias.id, existente.id)).run();
+      const categoriaId = existente?.id ?? crearCategoria(db, nombreCategoria);
       for (const p of lista) {
         guardarProducto(db, {
           categoriaId,

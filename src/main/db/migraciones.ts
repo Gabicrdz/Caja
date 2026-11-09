@@ -91,4 +91,70 @@ export const MIGRACIONES: Migracion[] = [
       INSERT INTO configuracion (clave, valor) VALUES ('nombre_local', 'Mi Local');
     `,
   },
+  {
+    nombre: 'Pedidos, renglones, agregados elegidos y pagos',
+    sql: /* sql */ `
+      CREATE TABLE pedidos (
+        id                 INTEGER PRIMARY KEY,
+        numero             INTEGER NOT NULL,              -- número del día: 1, 2, 3…
+        fecha              TEXT    NOT NULL,              -- 'AAAA-MM-DD'
+        hora               TEXT    NOT NULL,              -- 'HH:MM'
+        tipo               TEXT    NOT NULL CHECK (tipo IN ('mostrador', 'llevar', 'delivery', 'mesa')),
+        mesa               TEXT    NOT NULL DEFAULT '',
+        cliente_nombre     TEXT    NOT NULL DEFAULT '',
+        cliente_telefono   TEXT    NOT NULL DEFAULT '',
+        cliente_direccion  TEXT    NOT NULL DEFAULT '',
+        nota               TEXT    NOT NULL DEFAULT '',
+        subtotal_centavos  INTEGER NOT NULL CHECK (subtotal_centavos >= 0),
+        envio_centavos     INTEGER NOT NULL DEFAULT 0 CHECK (envio_centavos >= 0),
+        total_centavos     INTEGER NOT NULL CHECK (total_centavos >= 0),
+        estado             TEXT    NOT NULL DEFAULT 'pendiente'
+                           CHECK (estado IN ('pendiente', 'en_preparacion', 'listo', 'entregado', 'anulado')),
+        creado_en          TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+        UNIQUE (fecha, numero)
+      );
+
+      -- Cada renglón guarda una "foto" de nombres y precios (como en el stock):
+      -- si mañana cambia el menú, los pedidos viejos no cambian.
+      CREATE TABLE pedido_items (
+        id                 INTEGER PRIMARY KEY,
+        pedido_id          INTEGER NOT NULL REFERENCES pedidos (id),
+        producto_id        INTEGER NOT NULL REFERENCES productos (id),
+        variante_id        INTEGER REFERENCES variantes (id),
+        nombre             TEXT    NOT NULL,
+        variante_nombre    TEXT    NOT NULL DEFAULT '',
+        cantidad           INTEGER NOT NULL CHECK (cantidad > 0),
+        unitario_centavos  INTEGER NOT NULL CHECK (unitario_centavos >= 0),
+        agregados_centavos INTEGER NOT NULL DEFAULT 0 CHECK (agregados_centavos >= 0),
+        total_centavos     INTEGER NOT NULL CHECK (total_centavos >= 0),
+        nota               TEXT    NOT NULL DEFAULT '',
+        va_a_cocina        INTEGER NOT NULL DEFAULT 1 CHECK (va_a_cocina IN (0, 1)),
+        orden              INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX pedido_items_por_pedido ON pedido_items (pedido_id, orden);
+
+      CREATE TABLE pedido_item_agregados (
+        id               INTEGER PRIMARY KEY,
+        item_id          INTEGER NOT NULL REFERENCES pedido_items (id),
+        opcion_id        INTEGER NOT NULL REFERENCES opciones_agregado (id),
+        grupo_nombre     TEXT    NOT NULL,
+        nombre           TEXT    NOT NULL,
+        precio_centavos  INTEGER NOT NULL DEFAULT 0 CHECK (precio_centavos >= 0)
+      );
+      CREATE INDEX agregados_por_item ON pedido_item_agregados (item_id);
+
+      CREATE TABLE pagos (
+        id                 INTEGER PRIMARY KEY,
+        pedido_id          INTEGER NOT NULL REFERENCES pedidos (id),
+        medio              TEXT    NOT NULL CHECK (medio IN ('efectivo', 'transferencia', 'debito', 'credito', 'qr')),
+        monto_centavos     INTEGER NOT NULL CHECK (monto_centavos > 0),
+        recibido_centavos  INTEGER NOT NULL CHECK (recibido_centavos >= monto_centavos),
+        vuelto_centavos    INTEGER NOT NULL DEFAULT 0 CHECK (vuelto_centavos >= 0),
+        creado_en          TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+      );
+      CREATE INDEX pagos_por_pedido ON pagos (pedido_id);
+
+      INSERT INTO configuracion (clave, valor) VALUES ('envio_centavos', '150000');
+    `,
+  },
 ];

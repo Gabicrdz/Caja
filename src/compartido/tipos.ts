@@ -48,5 +48,47 @@ export interface Menu {
   grupos: GrupoAgregados[];
 }
 
+// ───────── Pedidos ─────────
+
+export const TIPOS_PEDIDO = ['mostrador', 'llevar', 'delivery', 'mesa'] as const;
+export type TipoPedido = (typeof TIPOS_PEDIDO)[number];
+
+export const MEDIOS_DE_PAGO = ['efectivo', 'transferencia', 'debito', 'credito', 'qr'] as const;
+export type MedioDePago = (typeof MEDIOS_DE_PAGO)[number];
+
+export const NOMBRE_MEDIO: Record<MedioDePago, string> = {
+  efectivo: 'Efectivo',
+  transferencia: 'Transferencia',
+  debito: 'Débito',
+  credito: 'Crédito',
+  qr: 'QR',
+};
+
+export const NOMBRE_TIPO: Record<TipoPedido, string> = {
+  mostrador: 'Mostrador',
+  llevar: 'Para llevar',
+  delivery: 'Delivery',
+  mesa: 'Mesa',
+};
+
+export interface PedidoCreado {
+  id: number;
+  /** Número del día (vuelve a 1 cada día): es el que se canta en el mostrador. */
+  numero: number;
+  totalCentavos: number;
+  vueltoCentavos: number;
+}
+
+export interface ResumenDelDia {
+  fecha: string;
+  pedidos: number;
+  totalCentavos: number;
+}
+
+export interface Configuracion {
+  nombreLocal: string;
+  envioCentavos: number;
+}
+
 /** Toda respuesta del main tiene esta forma (igual que en los proyectos anteriores). */
 export type Respuesta<T> = { ok: true; datos: T } | { ok: false; error: string };

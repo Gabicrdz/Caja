@@ -129,6 +129,16 @@
   }
 }
 
+/* Resalta un momento el renglón recién agregado al pedido. */
+@keyframes resaltar {
+  from {
+    background-color: var(--mostaza-suave);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

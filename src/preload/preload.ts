@@ -26,6 +26,13 @@ const api: ApiCaja = {
     guardar: (datos) => pedir(CANALES.grupoGuardar, datos),
     darDeBaja: (id) => pedir(CANALES.grupoBaja, id),
   },
+  pedidos: {
+    crear: (datos) => pedir(CANALES.pedidoCrear, datos),
+    resumenDeHoy: () => pedir(CANALES.pedidoResumenHoy),
+  },
+  configuracion: {
+    obtener: () => pedir(CANALES.configuracionObtener),
+  },
   sistema: {
     info: () => pedir(CANALES.sistemaInfo),
   },

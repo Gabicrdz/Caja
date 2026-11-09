@@ -128,3 +128,56 @@ export const esquemaGrupo = z
     });
   });
 export type DatosGrupo = z.input<typeof esquemaGrupo>;
+
+// ---------- Pedidos ----------
+const medio = z.enum(['efectivo', 'transferencia', 'debito', 'credito', 'qr']);
+const montoPositivo = z.number().int().positive('El monto tiene que ser mayor a cero.').max(PRECIO_MAXIMO);
+
+export const esquemaPedido = z
+  .object({
+    tipo: z.enum(['mostrador', 'llevar', 'delivery', 'mesa']),
+    mesa: z.string().trim().max(10, 'La mesa tiene hasta 10 caracteres.').default(''),
+    clienteNombre: textoOpcional(60),
+    clienteTelefono: z
+      .string()
+      .trim()
+      .max(30, 'El teléfono tiene hasta 30 caracteres.')
+      .regex(/^[\d\s()+-]*$/, 'El teléfono solo lleva números, espacios, +, - o paréntesis.')
+      .default(''),
+    clienteDireccion: textoOpcional(120),
+    nota: textoOpcional(140),
+    envioCentavos: precio.default(0),
+    items: z
+      .array(
+        z.object({
+          productoId: id,
+          varianteId: id.nullable(),
+          opcionesIds: z.array(id).max(30),
+          cantidad: z.number().int().min(1, 'La cantidad mínima es 1.').max(99, 'La cantidad máxima es 99.'),
+          nota: textoOpcional(80),
+        }),
+      )
+      .min(1, 'El pedido está vacío.')
+      .max(100, 'Un pedido tiene hasta 100 renglones.'),
+    pagos: z
+      .array(
+        z.object({
+          medio,
+          montoCentavos: montoPositivo,
+          /** Solo efectivo: con cuánto pagó (para calcular el vuelto). */
+          recibidoCentavos: montoPositivo.optional(),
+        }),
+      )
+      .max(5, 'Hasta 5 pagos por pedido.'),
+    /** El total que vio la persona al cobrar: si el menú cambió, no coincide. */
+    totalEsperadoCentavos: z.number().int().min(0),
+  })
+  .superRefine((p, ctx) => {
+    if (p.tipo === 'delivery' && !p.clienteDireccion) {
+      ctx.addIssue({ code: 'custom', path: ['clienteDireccion'], message: 'Para delivery falta la dirección.' });
+    }
+    if (p.tipo === 'mesa' && !p.mesa) {
+      ctx.addIssue({ code: 'custom', path: ['mesa'], message: 'Falta el número de mesa.' });
+    }
+  });
+export type DatosPedido = z.input<typeof esquemaPedido>;

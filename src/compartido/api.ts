@@ -1,11 +1,7 @@
 // El "contrato" entre la ventana y el main: qué se puede pedir y qué devuelve.
 // El preload lo implementa y la ventana lo usa con autocompletado.
-import type {
-  DatosCategoria,
-  DatosGrupo,
-  DatosProducto,
-} from './esquemas';
-import type { Menu, Respuesta } from './tipos';
+import type { DatosCategoria, DatosGrupo, DatosPedido, DatosProducto } from './esquemas';
+import type { Configuracion, Menu, PedidoCreado, Respuesta, ResumenDelDia } from './tipos';
 
 export interface ApiCaja {
   menu: {
@@ -28,6 +24,13 @@ export interface ApiCaja {
     guardar(datos: DatosGrupo): Promise<Respuesta<number>>;
     darDeBaja(id: number): Promise<Respuesta<null>>;
   };
+  pedidos: {
+    crear(datos: DatosPedido): Promise<Respuesta<PedidoCreado>>;
+    resumenDeHoy(): Promise<Respuesta<ResumenDelDia>>;
+  };
+  configuracion: {
+    obtener(): Promise<Respuesta<Configuracion>>;
+  };
   sistema: {
     info(): Promise<Respuesta<{ version: string; baseDeDatos: string }>>;
   };
@@ -47,5 +50,8 @@ export const CANALES = {
   productoBaja: 'productos:baja',
   grupoGuardar: 'grupos:guardar',
   grupoBaja: 'grupos:baja',
+  pedidoCrear: 'pedidos:crear',
+  pedidoResumenHoy: 'pedidos:resumen-hoy',
+  configuracionObtener: 'configuracion:obtener',
   sistemaInfo: 'sistema:info',
 } as const;

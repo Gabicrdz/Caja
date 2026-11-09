@@ -199,6 +199,9 @@ export function PaginaMenu() {
               ) : (
                 <SinResultados
                   hayFiltros={hayFiltros}
+                  menuSinProductos={productos.length === 0}
+                  cargandoEjemplo={cargarEjemplo.isPending}
+                  alCargarEjemplo={() => cargarEjemplo.mutate([])}
                   categoria={categoriaSeleccionada}
                   alLimpiar={() => {
                     setBusqueda('');
@@ -314,11 +317,17 @@ function MenuVacio({
 
 function SinResultados({
   hayFiltros,
+  menuSinProductos,
+  cargandoEjemplo,
+  alCargarEjemplo,
   categoria,
   alLimpiar,
   alCrear,
 }: {
   hayFiltros: boolean;
+  menuSinProductos: boolean;
+  cargandoEjemplo: boolean;
+  alCargarEjemplo: () => void;
   categoria: Categoria | null;
   alLimpiar: () => void;
   alCrear: () => void;
@@ -338,9 +347,21 @@ function SinResultados({
           <p className="font-display text-xl font-semibold">
             {categoria ? `${categoria.nombre} todavía no tiene productos` : 'Todavía no hay productos'}
           </p>
-          <Button onClick={alCrear}>
-            <Plus /> Nuevo producto
-          </Button>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button onClick={alCrear}>
+              <Plus /> Nuevo producto
+            </Button>
+            {menuSinProductos && (
+              <Button variant="outline" onClick={alCargarEjemplo} disabled={cargandoEjemplo}>
+                <Sparkles /> Cargar menú de ejemplo
+              </Button>
+            )}
+          </div>
+          {menuSinProductos && (
+            <p className="max-w-sm text-[13px] text-tinta-suave">
+              El ejemplo trae 24 productos y reutiliza las categorías que ya creaste con el mismo nombre.
+            </p>
+          )}
         </>
       )}
     </div>

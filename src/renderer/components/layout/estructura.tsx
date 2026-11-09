@@ -6,7 +6,7 @@ export function Estructura() {
   return (
     <div className="flex h-full">
       <Riel />
-      <main className="min-w-0 flex-1 overflow-y-auto">
+      <main className="h-full min-w-0 flex-1 overflow-y-auto">
         <Outlet />
       </main>
     </div>

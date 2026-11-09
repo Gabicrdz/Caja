@@ -22,7 +22,7 @@ interface Seccion {
 }
 
 const SECCIONES: Seccion[] = [
-  { ruta: '/vender', nombre: 'Vender', icono: ShoppingBag, llegaEn: 'la etapa 2' },
+  { ruta: '/vender', nombre: 'Vender', icono: ShoppingBag },
   { ruta: '/pedidos', nombre: 'Pedidos', icono: ReceiptText, llegaEn: 'la etapa 3' },
   { ruta: '/caja', nombre: 'Caja', icono: Wallet, llegaEn: 'la etapa 4' },
   { ruta: '/menu', nombre: 'Menú', icono: UtensilsCrossed },

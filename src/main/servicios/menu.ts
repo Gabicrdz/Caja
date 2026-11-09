@@ -25,7 +25,8 @@ const mismoNombre = (columna: typeof categorias.nombre, nombre: string) =>
 
 // ───────────────────────── Lectura ─────────────────────────
 
-export function obtenerMenu(db: BaseDeDatos): Menu {
+/** Lee el menú completo. Sirve con la base o dentro de una transacción. */
+export function obtenerMenu(db: Pick<BaseDeDatos, 'select'>): Menu {
   const filasCategorias = db
     .select({
       id: categorias.id,
