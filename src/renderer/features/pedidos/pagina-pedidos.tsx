@@ -10,6 +10,9 @@ import { useCambiarEstado, useCobrarPedido, usePedidos } from './consultas';
 import { DialogoDetalle } from './dialogo-detalle';
 import { DialogoImpresion } from './dialogo-impresion';
 import { TarjetaPedido, destinoDe, siguientePaso } from './tarjeta-pedido';
+import { useCajaActual } from '@/features/caja/consultas';
+import { DialogoAbrirCaja } from '@/features/caja/dialogo-abrir-caja';
+import { useUsuario } from '@/features/sesion/consultas';
 
 const COLUMNAS: { titulo: string; estados: EstadoPedido[]; vacio: string }[] = [
   { titulo: 'Pendientes', estados: ['pendiente'], vacio: 'Los pedidos nuevos aparecen acá.' },
@@ -27,6 +30,9 @@ export function PaginaPedidos() {
   const [abiertoId, setAbiertoId] = useState<number | null>(null);
   const [cobrando, setCobrando] = useState<{ pedido: PedidoDetalle; entregar: boolean } | null>(null);
   const [configurando, setConfigurando] = useState(false);
+  const [abriendoCaja, setAbriendoCaja] = useState(false);
+  const cajaActual = useCajaActual();
+  const { esDueno } = useUsuario();
 
   const lista = pedidos.data ?? [];
   const abierto = lista.find((p) => p.id === abiertoId) ?? null;
@@ -83,9 +89,11 @@ export function PaginaPedidos() {
               </Button>
             )}
           </div>
-          <Button variant="outline" onClick={() => setConfigurando(true)}>
-            <Printer /> Impresión
-          </Button>
+          {esDueno && (
+            <Button variant="outline" onClick={() => setConfigurando(true)}>
+              <Printer /> Impresión
+            </Button>
+          )}
         </div>
       </header>
 
@@ -138,6 +146,11 @@ export function PaginaPedidos() {
         totalCentavos={cobrando?.pedido.totalCentavos ?? 0}
         subtitulo={cobrando ? `Pedido #${cobrando.pedido.numero} · ${destinoDe(cobrando.pedido)}` : ''}
         textoTerminar={cobrando?.entregar ? 'Marcar entregado' : 'Listo'}
+        cajaCerrada={cajaActual.isSuccess && cajaActual.data === null}
+        alAbrirCaja={() => {
+          setCobrando(null); // un diálogo a la vez
+          setAbriendoCaja(true);
+        }}
         alCobrar={(pagos) => cobrar.mutateAsync({ id: cobrando!.pedido.id, pagos })}
         alCerrar={() => setCobrando(null)}
         alTerminar={() => {
@@ -146,6 +159,7 @@ export function PaginaPedidos() {
         }}
       />
       <DialogoImpresion abierto={configurando} alCerrar={() => setConfigurando(false)} />
+      <DialogoAbrirCaja abierto={abriendoCaja} alCerrar={() => setAbriendoCaja(false)} />
     </div>
   );
 }

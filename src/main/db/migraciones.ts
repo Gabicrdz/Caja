@@ -170,4 +170,52 @@ export const MIGRACIONES: Migracion[] = [
       INSERT INTO configuracion (clave, valor) VALUES ('impresora', ''), ('ancho_papel', '80');
     `,
   },
+  {
+    nombre: 'Usuarios con PIN, cajas (turnos), movimientos de caja y quién hizo cada cosa',
+    sql: /* sql */ `
+      CREATE TABLE usuarios (
+        id         INTEGER PRIMARY KEY,
+        nombre     TEXT    NOT NULL,
+        rol        TEXT    NOT NULL CHECK (rol IN ('dueno', 'cajero')),
+        -- Nunca se guarda el PIN: se guarda un "hash" (scrypt) con su sal.
+        pin_hash   TEXT    NOT NULL,
+        pin_sal    TEXT    NOT NULL,
+        activo     INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0, 1)),
+        creado_en  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+      );
+      CREATE UNIQUE INDEX usuarios_nombre_unico ON usuarios (nombre COLLATE NOCASE) WHERE activo = 1;
+
+      CREATE TABLE cajas (
+        id                   INTEGER PRIMARY KEY,
+        abierta_en           TEXT    NOT NULL,      -- 'AAAA-MM-DD HH:MM:SS'
+        abierta_por          INTEGER NOT NULL REFERENCES usuarios (id),
+        fondo_centavos       INTEGER NOT NULL CHECK (fondo_centavos >= 0),
+        cerrada_en           TEXT,
+        cerrada_por          INTEGER REFERENCES usuarios (id),
+        esperado_centavos    INTEGER,
+        contado_centavos     INTEGER CHECK (contado_centavos IS NULL OR contado_centavos >= 0),
+        diferencia_centavos  INTEGER,
+        nota                 TEXT    NOT NULL DEFAULT ''
+      );
+      -- Índice único "parcial": como mucho UNA caja sin cerrar.
+      CREATE UNIQUE INDEX una_sola_caja_abierta ON cajas ((cerrada_en IS NULL)) WHERE cerrada_en IS NULL;
+
+      CREATE TABLE movimientos_caja (
+        id              INTEGER PRIMARY KEY,
+        caja_id         INTEGER NOT NULL REFERENCES cajas (id),
+        tipo            TEXT    NOT NULL CHECK (tipo IN ('ingreso', 'retiro', 'gasto')),
+        monto_centavos  INTEGER NOT NULL CHECK (monto_centavos > 0),
+        motivo          TEXT    NOT NULL,
+        usuario_id      INTEGER NOT NULL REFERENCES usuarios (id),
+        creado_en       TEXT    NOT NULL
+      );
+      CREATE INDEX movimientos_por_caja ON movimientos_caja (caja_id);
+
+      ALTER TABLE pedidos ADD COLUMN usuario_id INTEGER REFERENCES usuarios (id);
+      ALTER TABLE pedidos ADD COLUMN anulado_por INTEGER REFERENCES usuarios (id);
+      ALTER TABLE pagos ADD COLUMN caja_id INTEGER REFERENCES cajas (id);
+      ALTER TABLE pagos ADD COLUMN usuario_id INTEGER REFERENCES usuarios (id);
+      CREATE INDEX pagos_por_caja ON pagos (caja_id);
+    `,
+  },
 ];

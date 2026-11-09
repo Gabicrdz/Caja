@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { Search, X } from 'lucide-react';
+import { Lock, Search, X } from 'lucide-react';
 import { NOMBRE_TIPO, type Producto } from '@compartido/tipos';
 import type { DatosPedido } from '@compartido/esquemas';
 import { pesos } from '@compartido/dinero';
@@ -16,6 +16,9 @@ import { DialogoCobro } from './dialogo-cobro';
 import { GrillaProductos } from './grilla-productos';
 import { PanelPedido } from './panel-pedido';
 import { useTotales } from './totales';
+import { useCajaActual } from '@/features/caja/consultas';
+import { DialogoAbrirCaja } from '@/features/caja/dialogo-abrir-caja';
+import { useUsuario } from '@/features/sesion/consultas';
 
 export function PaginaVender() {
   const menu = useMenu();
@@ -29,6 +32,10 @@ export function PaginaVender() {
   const buscador = useRef<HTMLInputElement>(null);
   const cargarEjemplo = useAccion(caja().menu.cargarEjemplo, { exito: 'Menú de ejemplo cargado' });
   const crearPedido = useCrearPedido();
+  const cajaActual = useCajaActual();
+  const cajaCerrada = cajaActual.isSuccess && cajaActual.data === null;
+  const [abriendoCaja, setAbriendoCaja] = useState(false);
+  const { esDueno } = useUsuario();
 
   const envioPorDefecto = configuracion.data?.envioCentavos ?? 0;
   const totales = useTotales(menu.data, carrito.items, carrito.tipo, carrito.envioCentavos ?? envioPorDefecto);
@@ -122,7 +129,7 @@ export function PaginaVender() {
           <Button asChild>
             <Link to="/menu">Ir al Menú</Link>
           </Button>
-          {menu.data.productos.length === 0 && (
+          {menu.data.productos.length === 0 && esDueno && (
             <Button variant="outline" disabled={cargarEjemplo.isPending} onClick={() => cargarEjemplo.mutate([])}>
               Cargar menú de ejemplo
             </Button>
@@ -136,6 +143,16 @@ export function PaginaVender() {
     <div className="grid h-full grid-cols-[1fr_400px]">
       {/* ── Catálogo ── */}
       <section aria-label="Productos" className="flex min-h-0 min-w-0 flex-col">
+        {cajaCerrada && (
+          <div role="status" className="flex items-center justify-between gap-4 bg-riel px-7 py-3 text-white">
+            <span className="flex items-center gap-2.5 font-semibold">
+              <Lock className="size-[18px] text-mostaza" /> La caja está cerrada: podés tomar pedidos, pero para cobrar hay que abrirla.
+            </span>
+            <Button size="sm" onClick={() => setAbriendoCaja(true)}>
+              Abrir caja
+            </Button>
+          </div>
+        )}
         <div className="flex flex-col gap-4 px-7 pt-6 pb-4">
           <div className="flex items-center gap-4">
             <div className="relative flex-1">
@@ -247,6 +264,11 @@ export function PaginaVender() {
         }
         alCobrar={(pagos) => crearPedido.mutateAsync({ ...armarPedido(), pagos })}
         alGuardarSinCobrar={() => crearPedido.mutateAsync({ ...armarPedido(), pagos: [] })}
+        cajaCerrada={cajaCerrada}
+        alAbrirCaja={() => {
+          setCobrando(false); // un diálogo a la vez
+          setAbriendoCaja(true);
+        }}
         alCerrar={() => {
           setCobrando(false);
           enfocarBuscador();
@@ -258,6 +280,7 @@ export function PaginaVender() {
           enfocarBuscador();
         }}
       />
+      <DialogoAbrirCaja abierto={abriendoCaja} alCerrar={() => setAbriendoCaja(false)} />
     </div>
   );
 }

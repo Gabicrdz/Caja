@@ -204,3 +204,35 @@ export const esquemaImpresion = z.object({
   anchoPapel: z.union([z.literal(58), z.literal(80)]),
 });
 export type DatosImpresion = z.input<typeof esquemaImpresion>;
+
+// ---------- Usuarios ----------
+export const esquemaPin = z
+  .string()
+  .regex(/^\d{4,6}$/, 'El PIN tiene que ser de 4 a 6 números.');
+
+export const esquemaUsuario = z.object({
+  id: id.optional(),
+  nombre: texto('el nombre', 30),
+  rol: z.enum(['dueno', 'cajero']),
+  /** Obligatorio al crear; al editar, vacío = no cambiar el PIN. */
+  pin: z.union([esquemaPin, z.literal('')]).default(''),
+});
+export type DatosUsuario = z.input<typeof esquemaUsuario>;
+
+// ---------- Caja ----------
+export const esquemaAbrirCaja = z.object({
+  fondoCentavos: z.number().int().min(0, 'El fondo no puede ser negativo.').max(PRECIO_MAXIMO),
+});
+
+export const esquemaMovimiento = z.object({
+  tipo: z.enum(['ingreso', 'retiro', 'gasto']),
+  montoCentavos: montoPositivo,
+  motivo: texto('el motivo', 80),
+});
+export type DatosMovimiento = z.input<typeof esquemaMovimiento>;
+
+export const esquemaCerrarCaja = z.object({
+  contadoCentavos: z.number().int().min(0, 'El efectivo contado no puede ser negativo.').max(PRECIO_MAXIMO),
+  nota: textoOpcional(140),
+});
+export type DatosCerrarCaja = z.input<typeof esquemaCerrarCaja>;

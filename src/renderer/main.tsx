@@ -1,15 +1,20 @@
 // Punto de entrada de la VENTANA (proceso renderer): arma React con el router,
 // TanStack Query (datos del main) y los avisos (toasts).
-import { StrictMode } from 'react';
+import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createHashRouter, Navigate, RouterProvider } from 'react-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Estructura } from '@/components/layout/estructura';
 import { PaginaMenu } from '@/features/menu/pagina-menu';
 import { PaginaVender } from '@/features/vender/pagina-vender';
 import { PaginaPedidos } from '@/features/pedidos/pagina-pedidos';
+import { PaginaCaja } from '@/features/caja/pagina-caja';
+import { PaginaAjustes } from '@/features/ajustes/pagina-ajustes';
+import { PantallaIngreso } from '@/features/sesion/pantalla-ingreso';
+import { CLAVE_SESION, useSesion, useUsuario } from '@/features/sesion/consultas';
+import type { ReactNode } from 'react';
 import './index.css';
 
 // La app instalada se abre desde un archivo (file://), por eso usamos el
@@ -22,11 +27,33 @@ const router = createHashRouter([
       { index: true, element: <Navigate to="/vender" replace /> },
       { path: 'vender', element: <PaginaVender /> },
       { path: 'pedidos', element: <PaginaPedidos /> },
+      { path: 'caja', element: <PaginaCaja /> },
+      { path: 'ajustes', element: <SoloDueno><PaginaAjustes /></SoloDueno> },
       { path: 'menu', element: <PaginaMenu /> },
       { path: '*', element: <Navigate to="/vender" replace /> },
     ],
   },
 ]);
+
+/** Si un cajero llega a una sección del dueño, vuelve a Vender. */
+function SoloDueno({ children }: { children: ReactNode }) {
+  const { esDueno } = useUsuario();
+  return esDueno ? children : <Navigate to="/vender" replace />;
+}
+
+/** Sin sesión se ve la pantalla de ingreso; con sesión, el sistema. */
+function Raiz() {
+  const sesion = useSesion();
+  const cliente = useQueryClient();
+  useEffect(() => {
+    const revisar = () => void cliente.invalidateQueries({ queryKey: CLAVE_SESION });
+    window.addEventListener('sesion-cerrada', revisar);
+    return () => window.removeEventListener('sesion-cerrada', revisar);
+  }, [cliente]);
+  if (sesion.isPending) return null;
+  if (!sesion.data) return <PantallaIngreso />;
+  return <RouterProvider router={router} />;
+}
 
 const consultas = new QueryClient({
   defaultOptions: {
@@ -41,7 +68,7 @@ createRoot(document.getElementById('raiz')!).render(
   <StrictMode>
     <QueryClientProvider client={consultas}>
       <TooltipProvider delayDuration={300}>
-        <RouterProvider router={router} />
+        <Raiz />
         <Toaster
           position="top-center"
           toastOptions={{

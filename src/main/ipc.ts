@@ -1,25 +1,28 @@
 // Conecta los pedidos de la ventana (ipcRenderer.invoke) con los servicios.
-// Cada canal valida lo que llega con Zod ANTES de tocar la base de datos.
+// Cada canal:
+//   1. revisa QUIÉN pide (sesión y rol) — los permisos se controlan acá,
+//      en el main, no en los botones de la ventana;
+//   2. valida lo que llega con Zod ANTES de tocar la base de datos.
 import { ipcMain } from 'electron';
 import { z, type ZodType } from 'zod';
 import { CANALES } from '@compartido/api';
 import {
+  esquemaAbrirCaja,
   esquemaCategoria,
-  esquemaDisponible,
-  esquemaEditarCategoria,
-  esquemaEstadoCategoria,
-  esquemaGrupo,
-  esquemaId,
-  esquemaMoverCategoria,
+  esquemaCerrarCaja,
   esquemaEstado,
   esquemaFecha,
+  esquemaGrupo,
   esquemaImpresion,
   esquemaMotivo,
+  esquemaMovimiento,
   esquemaPagos,
   esquemaPedido,
+  esquemaPin,
   esquemaProducto,
+  esquemaUsuario,
 } from '@compartido/esquemas';
-import type { Respuesta } from '@compartido/tipos';
+import type { Respuesta, Usuario } from '@compartido/tipos';
 import { obtenerDb } from './db/conexion';
 import { ErrorDeUsuario } from './servicios/errores';
 import * as menu from './servicios/menu';
@@ -34,7 +37,10 @@ import {
   resumenDelDia,
 } from './servicios/pedidos';
 import { guardarImpresion, obtenerConfiguracion } from './servicios/configuracion';
-import { htmlImpresion } from './impresion/plantillas';
+import { darDeBajaUsuario, guardarUsuario, hayUsuarios, listarUsuarios } from './servicios/usuarios';
+import { cerrarSesion, iniciarSesion, requerir, sesionActual } from './servicios/sesion';
+import { abrirCaja, cajaAbierta, cerrarCaja, historialDeCajas, registrarMovimiento, resumenDeCaja } from './servicios/caja';
+import { htmlCierre, htmlImpresion } from './impresion/plantillas';
 import { guardarPdf, imprimirHtml, listarImpresoras } from './impresion/imprimir';
 
 /** Convierte cualquier error en un mensaje para la ventana. */
@@ -47,146 +53,168 @@ export function mensajeDeError(error: unknown): string {
   return 'Ocurrió un error inesperado. Si se repite, avisale a quien te instaló el sistema.';
 }
 
-/** Ejecuta `fn` y arma la respuesta { ok, datos } o { ok: false, error }. */
-export function responder<T>(fn: () => T): Respuesta<T> {
-  try {
-    return { ok: true, datos: fn() };
-  } catch (error) {
-    return { ok: false, error: mensajeDeError(error) };
-  }
+/**
+ * Quién puede usar cada canal:
+ * - 'libre': sin sesión (pantalla de ingreso).
+ * - 'sesion': cualquier usuario que haya puesto su PIN.
+ * - 'dueno': solo el dueño.
+ */
+type Permiso = 'libre' | 'sesion' | 'dueno';
+
+function controlar(permiso: Permiso): Usuario | null {
+  if (permiso === 'libre') return sesionActual();
+  return requerir(permiso === 'dueno' ? 'dueno' : undefined);
 }
 
 /**
  * Registra un canal. `esquema` describe los argumentos que manda la ventana
- * (como lista: [arg1, arg2…]); Zod los revisa y recién ahí llama a `fn`.
+ * (como lista: [arg1, arg2…]). `fn` recibe los argumentos ya validados y, al
+ * final, el usuario de la sesión.
  */
 export function manejar<E extends ZodType<unknown[]>, T>(
   canal: string,
+  permiso: Permiso,
   esquema: E,
-  fn: (...args: z.output<E>) => T,
-): void {
-  ipcMain.handle(canal, (_evento, ...args: unknown[]) =>
-    responder(() => fn(...(esquema.parse(args) as z.output<E>))),
-  );
-}
-
-/** Igual que manejar, para tareas que tardan (imprimir, guardar un PDF). */
-export function manejarAsync<E extends ZodType<unknown[]>, T>(
-  canal: string,
-  esquema: E,
-  fn: (...args: z.output<E>) => Promise<T>,
+  fn: (...args: [...z.output<E>, Usuario]) => T | Promise<T>,
 ): void {
   ipcMain.handle(canal, async (_evento, ...args: unknown[]): Promise<Respuesta<T>> => {
     try {
-      return { ok: true, datos: await fn(...(esquema.parse(args) as z.output<E>)) };
+      const usuario = controlar(permiso);
+      const validados = esquema.parse(args) as z.output<E>;
+      return { ok: true, datos: await fn(...validados, usuario as Usuario) };
     } catch (error) {
       return { ok: false, error: mensajeDeError(error) };
     }
   });
 }
 
-const sinArgumentos = z.tuple([]);
-const tipoImpresion = z.enum(['comanda', 'ticket']);
+const nada = z.tuple([]);
+const id = z.number().int().positive();
+const tipoImpresion = z.enum(['comanda', 'ticket', 'cierre']);
 
-/** Arma el HTML de la comanda o el ticket de un pedido, con la configuración actual. */
-function documentoDe(id: number, tipo: 'comanda' | 'ticket') {
+/** Arma el HTML de lo que haya que imprimir, con la configuración actual. */
+function documentoDe(idDocumento: number, tipo: 'comanda' | 'ticket' | 'cierre') {
   const db = obtenerDb();
-  const pedido = obtenerPedido(db, id);
   const config = obtenerConfiguracion(db);
+  if (tipo === 'cierre') {
+    const resumen = resumenDeCaja(db, idDocumento);
+    return { html: htmlCierre(resumen, config.nombreLocal, config.anchoPapel), nombre: `cierre-caja-${idDocumento}`, config };
+  }
+  const pedido = obtenerPedido(db, idDocumento);
   const html = htmlImpresion(tipo, pedido, config.nombreLocal, config.anchoPapel);
-  if (!html) throw new ErrorDeUsuario(`El pedido #${pedido.numero} no tiene nada para la cocina (solo bebidas o productos que no se preparan).`);
-  return { html, pedido, config };
+  if (!html) {
+    throw new ErrorDeUsuario(`El pedido #${pedido.numero} no tiene nada para la cocina (solo bebidas o productos que no se preparan).`);
+  }
+  return { html, nombre: `${pedido.fecha}_pedido-${pedido.numero}_${tipo}`, config };
 }
 
 export function registrarCanales(info: () => { version: string; baseDeDatos: string }): void {
   const db = () => obtenerDb();
+  const sinDatos = () => null;
 
-  manejar(CANALES.menuObtener, sinArgumentos, () => menu.obtenerMenu(db()));
-  manejar(CANALES.menuCargarEjemplo, sinArgumentos, () => {
+  // ── Ingreso ──
+  manejar(CANALES.sesionActual, 'libre', nada, () => sesionActual());
+  manejar(CANALES.sesionIniciar, 'libre', z.tuple([id, z.string().max(10)]), (usuarioId, pin) => iniciarSesion(db(), usuarioId, pin));
+  manejar(CANALES.sesionCerrar, 'libre', nada, () => {
+    cerrarSesion();
+    return null;
+  });
+  manejar(CANALES.usuariosParaIngresar, 'libre', nada, () => listarUsuarios(db()));
+  manejar(CANALES.usuariosCrearPrimero, 'libre', z.tuple([z.string(), esquemaPin]), (nombre, pin) => {
+    // Solo sirve la primera vez: después, los usuarios los crea el dueño.
+    if (hayUsuarios(db())) throw new ErrorDeUsuario('Ya hay usuarios creados. Ingresá con tu PIN.');
+    const usuarioId = guardarUsuario(db(), esquemaUsuario.parse({ nombre, rol: 'dueno', pin }));
+    return iniciarSesion(db(), usuarioId, pin);
+  });
+
+  // ── Usuarios (solo el dueño) ──
+  manejar(CANALES.usuariosListar, 'dueno', nada, () => listarUsuarios(db()));
+  manejar(CANALES.usuariosGuardar, 'dueno', z.tuple([esquemaUsuario]), (d) => guardarUsuario(db(), d));
+  manejar(CANALES.usuariosBaja, 'dueno', z.tuple([id]), (usuarioId, yo) => {
+    darDeBajaUsuario(db(), usuarioId, yo.id);
+    return null;
+  });
+
+  // ── Menú: todos lo ven; solo el dueño lo cambia ──
+  manejar(CANALES.menuObtener, 'sesion', nada, () => menu.obtenerMenu(db()));
+  manejar(CANALES.menuCargarEjemplo, 'dueno', nada, () => {
     cargarMenuDeEjemplo(db());
     return null;
   });
-
-  manejar(CANALES.categoriaCrear, z.tuple([esquemaCategoria]), (d) =>
-    menu.crearCategoria(db(), d.nombre),
-  );
-  manejar(
-    CANALES.categoriaRenombrar,
-    z.tuple([z.number(), esquemaCategoria]),
-    (id, d) => {
-      const { nombre } = esquemaEditarCategoria.parse({ id, ...d });
-      menu.renombrarCategoria(db(), id, nombre);
-      return null;
-    },
-  );
-  manejar(
-    CANALES.categoriaMover,
-    z.tuple([z.number(), z.enum(['arriba', 'abajo'])]),
-    (id, direccion) => {
-      esquemaMoverCategoria.parse({ id, direccion });
-      menu.moverCategoria(db(), id, direccion);
-      return null;
-    },
-  );
-  manejar(CANALES.categoriaEstado, z.tuple([z.number(), z.boolean()]), (id, activa) => {
-    esquemaEstadoCategoria.parse({ id, activa });
-    menu.cambiarEstadoCategoria(db(), id, activa);
+  manejar(CANALES.categoriaCrear, 'dueno', z.tuple([esquemaCategoria]), (d) => menu.crearCategoria(db(), d.nombre));
+  manejar(CANALES.categoriaRenombrar, 'dueno', z.tuple([id, esquemaCategoria]), (categoriaId, d) => {
+    menu.renombrarCategoria(db(), categoriaId, d.nombre);
+    return null;
+  });
+  manejar(CANALES.categoriaMover, 'dueno', z.tuple([id, z.enum(['arriba', 'abajo'])]), (categoriaId, direccion) => {
+    menu.moverCategoria(db(), categoriaId, direccion);
+    return null;
+  });
+  manejar(CANALES.categoriaEstado, 'dueno', z.tuple([id, z.boolean()]), (categoriaId, activa) => {
+    menu.cambiarEstadoCategoria(db(), categoriaId, activa);
+    return null;
+  });
+  manejar(CANALES.productoGuardar, 'dueno', z.tuple([esquemaProducto]), (d) => menu.guardarProducto(db(), d));
+  // "Agotado" lo puede marcar cualquiera: el que atiende es el que sabe que se terminó.
+  manejar(CANALES.productoDisponible, 'sesion', z.tuple([id, z.boolean()]), (productoId, disponible) => {
+    menu.cambiarDisponible(db(), productoId, disponible);
+    return null;
+  });
+  manejar(CANALES.productoDuplicar, 'dueno', z.tuple([id]), (productoId) => menu.duplicarProducto(db(), productoId));
+  manejar(CANALES.productoBaja, 'dueno', z.tuple([id]), (productoId) => {
+    menu.darDeBajaProducto(db(), productoId);
+    return null;
+  });
+  manejar(CANALES.grupoGuardar, 'dueno', z.tuple([esquemaGrupo]), (d) => menu.guardarGrupo(db(), d));
+  manejar(CANALES.grupoBaja, 'dueno', z.tuple([id]), (grupoId) => {
+    menu.darDeBajaGrupo(db(), grupoId);
     return null;
   });
 
-  manejar(CANALES.productoGuardar, z.tuple([esquemaProducto]), (d) =>
-    menu.guardarProducto(db(), d),
-  );
-  manejar(CANALES.productoDisponible, z.tuple([z.number(), z.boolean()]), (id, disponible) => {
-    esquemaDisponible.parse({ id, disponible });
-    menu.cambiarDisponible(db(), id, disponible);
+  // ── Pedidos ──
+  manejar(CANALES.pedidoCrear, 'sesion', z.tuple([esquemaPedido]), (d, yo) => crearPedido(db(), d, new Date(), yo.id));
+  manejar(CANALES.pedidoResumenHoy, 'sesion', nada, () => resumenDelDia(db()));
+  manejar(CANALES.pedidoListar, 'sesion', z.tuple([esquemaFecha]), (fecha) => listarPedidos(db(), { fecha }));
+  manejar(CANALES.pedidoEstado, 'sesion', z.tuple([id, esquemaEstado]), (pedidoId, estado) => {
+    cambiarEstado(db(), pedidoId, estado);
     return null;
   });
-  manejar(CANALES.productoDuplicar, z.tuple([z.number()]), (id) =>
-    menu.duplicarProducto(db(), esquemaId.parse({ id }).id),
-  );
-  manejar(CANALES.productoBaja, z.tuple([z.number()]), (id) => {
-    menu.darDeBajaProducto(db(), esquemaId.parse({ id }).id);
+  manejar(CANALES.pedidoAnular, 'dueno', z.tuple([id, esquemaMotivo]), (pedidoId, motivo, yo) => {
+    anularPedido(db(), pedidoId, motivo, yo.id);
     return null;
   });
+  manejar(CANALES.pedidoCobrar, 'sesion', z.tuple([id, esquemaPagos]), (pedidoId, pagos, yo) => cobrarPedido(db(), pedidoId, pagos, yo.id));
 
-  manejar(CANALES.grupoGuardar, z.tuple([esquemaGrupo]), (d) => menu.guardarGrupo(db(), d));
-  manejar(CANALES.grupoBaja, z.tuple([z.number()]), (id) => {
-    menu.darDeBajaGrupo(db(), esquemaId.parse({ id }).id);
+  // ── Caja ──
+  manejar(CANALES.cajaActual, 'sesion', nada, () => {
+    const caja = cajaAbierta(db());
+    return caja ? resumenDeCaja(db(), caja.id) : null;
+  });
+  manejar(CANALES.cajaAbrir, 'sesion', z.tuple([esquemaAbrirCaja]), (d, yo) => abrirCaja(db(), d.fondoCentavos, yo));
+  manejar(CANALES.cajaMovimiento, 'sesion', z.tuple([esquemaMovimiento]), (d, yo) => {
+    registrarMovimiento(db(), d, yo);
     return null;
   });
+  manejar(CANALES.cajaCerrar, 'sesion', z.tuple([esquemaCerrarCaja]), (d, yo) => cerrarCaja(db(), d, yo));
+  manejar(CANALES.cajaHistorial, 'dueno', nada, () => historialDeCajas(db()));
+  manejar(CANALES.cajaResumen, 'dueno', z.tuple([id]), (cajaId) => resumenDeCaja(db(), cajaId));
 
-  manejar(CANALES.pedidoCrear, z.tuple([esquemaPedido]), (d) => crearPedido(db(), d));
-  manejar(CANALES.pedidoResumenHoy, sinArgumentos, () => resumenDelDia(db()));
-  manejar(CANALES.pedidoListar, z.tuple([esquemaFecha]), (fecha) => listarPedidos(db(), { fecha }));
-  manejar(CANALES.pedidoEstado, z.tuple([z.number().int().positive(), esquemaEstado]), (id, estado) => {
-    cambiarEstado(db(), id, estado);
-    return null;
-  });
-  manejar(CANALES.pedidoAnular, z.tuple([z.number().int().positive(), esquemaMotivo]), (id, motivo) => {
-    anularPedido(db(), id, motivo);
-    return null;
-  });
-  manejar(CANALES.pedidoCobrar, z.tuple([z.number().int().positive(), esquemaPagos]), (id, pagos) =>
-    cobrarPedido(db(), id, pagos),
-  );
-
-  manejarAsync(CANALES.impresionImprimir, z.tuple([z.number().int().positive(), tipoImpresion]), async (id, tipo) => {
-    const { html, config } = documentoDe(id, tipo);
+  // ── Impresión ──
+  manejar(CANALES.impresionImprimir, 'sesion', z.tuple([id, tipoImpresion]), async (idDocumento, tipo) => {
+    const { html, config } = documentoDe(idDocumento, tipo);
     return { impreso: await imprimirHtml(html, config.anchoPapel, config.impresora) };
   });
-  manejarAsync(CANALES.impresionPdf, z.tuple([z.number().int().positive(), tipoImpresion]), async (id, tipo) => {
-    const { html, pedido, config } = documentoDe(id, tipo);
-    const nombre = `${pedido.fecha}_pedido-${pedido.numero}_${tipo}.pdf`;
-    return { ruta: await guardarPdf(html, config.anchoPapel, nombre) };
+  manejar(CANALES.impresionPdf, 'sesion', z.tuple([id, tipoImpresion]), async (idDocumento, tipo) => {
+    const { html, nombre, config } = documentoDe(idDocumento, tipo);
+    return { ruta: await guardarPdf(html, config.anchoPapel, `${nombre}.pdf`) };
   });
-  manejarAsync(CANALES.impresionImpresoras, sinArgumentos, () => listarImpresoras());
+  manejar(CANALES.impresionImpresoras, 'dueno', nada, () => listarImpresoras());
 
-  manejar(CANALES.configuracionObtener, sinArgumentos, () => obtenerConfiguracion(db()));
-  manejar(CANALES.configuracionImpresion, z.tuple([esquemaImpresion]), (d) => {
+  // ── Configuración y sistema ──
+  manejar(CANALES.configuracionObtener, 'libre', nada, () => obtenerConfiguracion(db()));
+  manejar(CANALES.configuracionImpresion, 'dueno', z.tuple([esquemaImpresion]), (d) => {
     guardarImpresion(db(), d);
-    return null;
+    return sinDatos();
   });
-
-  manejar(CANALES.sistemaInfo, sinArgumentos, info);
+  manejar(CANALES.sistemaInfo, 'libre', nada, info);
 }

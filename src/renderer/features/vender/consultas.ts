@@ -30,6 +30,7 @@ export function useCrearPedido() {
       Promise.all([
         cliente.invalidateQueries({ queryKey: CLAVE_RESUMEN }),
         cliente.invalidateQueries({ queryKey: ['pedidos'] }),
+        cliente.invalidateQueries({ queryKey: ['caja'] }),
       ]),
     // Si falló porque cambió el menú, lo volvemos a pedir para mostrar lo nuevo.
     onError: () => cliente.invalidateQueries({ queryKey: CLAVE_MENU }),

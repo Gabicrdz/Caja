@@ -130,7 +130,66 @@ export interface PedidoDetalle {
   pagos: PagoDetalle[];
 }
 
-export type TipoImpresion = 'comanda' | 'ticket';
+export type TipoImpresion = 'comanda' | 'ticket' | 'cierre';
+
+// ───────── Usuarios y caja ─────────
+
+export type Rol = 'dueno' | 'cajero';
+export const NOMBRE_ROL: Record<Rol, string> = { dueno: 'Dueño', cajero: 'Cajero' };
+
+/** Lo que se sabe de un usuario (nunca viaja el PIN ni su hash). */
+export interface Usuario {
+  id: number;
+  nombre: string;
+  rol: Rol;
+}
+
+export type TipoMovimiento = 'ingreso' | 'retiro' | 'gasto';
+export const NOMBRE_MOVIMIENTO: Record<TipoMovimiento, string> = {
+  ingreso: 'Ingreso',
+  retiro: 'Retiro',
+  gasto: 'Gasto',
+};
+
+export interface MovimientoCaja {
+  id: number;
+  tipo: TipoMovimiento;
+  montoCentavos: number;
+  motivo: string;
+  usuario: string;
+  hora: string;
+}
+
+export interface Caja {
+  id: number;
+  abiertaEn: string;
+  abiertaPor: string;
+  fondoCentavos: number;
+  cerradaEn: string | null;
+  cerradaPor: string | null;
+  esperadoCentavos: number | null;
+  contadoCentavos: number | null;
+  diferenciaCentavos: number | null;
+  nota: string;
+}
+
+/** Todo lo que pasó en una caja: lo que se muestra en pantalla y en el cierre impreso. */
+export interface ResumenCaja {
+  caja: Caja;
+  /** Por medio de pago: cuántos cobros y cuánto (sin pedidos anulados). */
+  porMedio: Record<MedioDePago, { cobros: number; montoCentavos: number }>;
+  ventasCentavos: number;
+  pedidosCobrados: number;
+  pedidosAnulados: number;
+  /** Pedidos tomados durante la caja que todavía no se cobraron. */
+  sinCobrar: { cantidad: number; totalCentavos: number };
+  movimientos: MovimientoCaja[];
+  ingresosCentavos: number;
+  retirosCentavos: number;
+  gastosCentavos: number;
+  /** fondo + efectivo cobrado + ingresos − retiros − gastos */
+  efectivoEsperadoCentavos: number;
+}
 
 export interface Impresora {
   /** Nombre que entiende Windows (el que se guarda). */

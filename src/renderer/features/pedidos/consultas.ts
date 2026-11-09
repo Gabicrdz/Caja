@@ -24,6 +24,7 @@ function useRefrescar() {
     Promise.all([
       cliente.invalidateQueries({ queryKey: CLAVE_PEDIDOS }),
       cliente.invalidateQueries({ queryKey: CLAVE_RESUMEN }),
+      cliente.invalidateQueries({ queryKey: ['caja'] }),
     ]);
 }
 
@@ -61,7 +62,7 @@ export function useImprimir() {
   const imprimir = useMutation({
     mutationFn: ({ id, tipo }: { id: number; tipo: TipoImpresion }) => desenvolver(caja().impresion.imprimir(id, tipo)),
     onSuccess: (r, { tipo }) => {
-      if (r.impreso) toast.success(tipo === 'comanda' ? 'Comanda enviada a la impresora' : 'Ticket enviado a la impresora');
+      if (r.impreso) toast.success(`${{ comanda: 'Comanda', ticket: 'Ticket', cierre: 'Cierre' }[tipo]} enviado a la impresora`);
     },
     onError: (e) => toast.error(e.message),
   });

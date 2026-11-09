@@ -17,6 +17,7 @@ import {
 import { ErrorDeUsuario } from './errores';
 import { obtenerMenu } from './menu';
 import { fechaLocal, horaLocal } from './fechas';
+import { cajaAbierta } from './caja';
 
 type PedidoValidado = z.output<typeof esquemaPedido>;
 type PagosValidados = z.output<typeof esquemaPagos>;
@@ -45,7 +46,20 @@ function calcularPagos(lista: PagosValidados, totalCentavos: number) {
   });
 }
 
-function guardarPagos(tx: Tx, pedidoId: number, lista: ReturnType<typeof calcularPagos>): void {
+/** Todo cobro queda en la caja abierta (para el arqueo). Sin caja abierta no se cobra. */
+function cajaParaCobrar(tx: Tx): number {
+  const caja = cajaAbierta(tx);
+  if (!caja) throw new ErrorDeUsuario('La caja está cerrada. Abrila (pantalla Caja) para poder cobrar.');
+  return caja.id;
+}
+
+function guardarPagos(
+  tx: Tx,
+  pedidoId: number,
+  lista: ReturnType<typeof calcularPagos>,
+  cajaId: number,
+  usuarioId: number | null,
+): void {
   for (const p of lista) {
     tx.insert(pagos)
       .values({
@@ -54,12 +68,19 @@ function guardarPagos(tx: Tx, pedidoId: number, lista: ReturnType<typeof calcula
         montoCentavos: p.montoCentavos,
         recibidoCentavos: p.recibidoCentavos,
         vueltoCentavos: p.vueltoCentavos,
+        cajaId,
+        usuarioId,
       })
       .run();
   }
 }
 
-export function crearPedido(db: BaseDeDatos, datos: PedidoValidado, ahora: Date = new Date()): PedidoCreado {
+export function crearPedido(
+  db: BaseDeDatos,
+  datos: PedidoValidado,
+  ahora: Date = new Date(),
+  usuarioId: number | null = null,
+): PedidoCreado {
   return db.transaction((tx) => {
     // 1) Volver a armar cada renglón con los precios de la base.
     const menu = obtenerMenu(tx);
@@ -89,6 +110,7 @@ export function crearPedido(db: BaseDeDatos, datos: PedidoValidado, ahora: Date 
     // 3) Pagos: sin pagos = "cobrar después". Si hay, tienen que cerrar justo.
     const cobrado = datos.pagos.length > 0 || totalCentavos === 0;
     const pagosCalculados = datos.pagos.length > 0 ? calcularPagos(datos.pagos, totalCentavos) : [];
+    const cajaId = pagosCalculados.length > 0 ? cajaParaCobrar(tx) : null;
 
     // 4) Número del día y guardado (todo dentro de la misma transacción).
     const fecha = fechaLocal(ahora);
@@ -114,6 +136,7 @@ export function crearPedido(db: BaseDeDatos, datos: PedidoValidado, ahora: Date 
         envioCentavos,
         totalCentavos,
         cobrado,
+        usuarioId,
       })
       .returning({ id: pedidos.id })
       .get().id;
@@ -150,7 +173,7 @@ export function crearPedido(db: BaseDeDatos, datos: PedidoValidado, ahora: Date 
       }
     });
 
-    guardarPagos(tx, pedidoId, pagosCalculados);
+    if (cajaId !== null) guardarPagos(tx, pedidoId, pagosCalculados, cajaId, usuarioId);
 
     return {
       id: pedidoId,
@@ -267,26 +290,31 @@ export function cambiarEstado(db: BaseDeDatos, id: number, estado: z.output<type
 }
 
 /** Anular no borra: el pedido queda con su motivo y deja de sumar en el día. */
-export function anularPedido(db: BaseDeDatos, id: number, motivo: string): void {
+export function anularPedido(db: BaseDeDatos, id: number, motivo: string, usuarioId: number | null = null): void {
   db.transaction((tx) => {
     const pedido = obtenerPedido(tx, id);
     if (pedido.estado === 'anulado') throw new ErrorDeUsuario(`El pedido #${pedido.numero} ya estaba anulado.`);
     tx.update(pedidos)
-      .set({ estado: 'anulado', motivoAnulacion: motivo, anuladoEn: ahoraSql, actualizadoEn: ahoraSql })
+      .set({ estado: 'anulado', motivoAnulacion: motivo, anuladoEn: ahoraSql, actualizadoEn: ahoraSql, anuladoPor: usuarioId })
       .where(eq(pedidos.id, id))
       .run();
   });
 }
 
 /** Cobra un pedido que se había guardado para cobrar después. */
-export function cobrarPedido(db: BaseDeDatos, id: number, lista: PagosValidados): PedidoCreado {
+export function cobrarPedido(
+  db: BaseDeDatos,
+  id: number,
+  lista: PagosValidados,
+  usuarioId: number | null = null,
+): PedidoCreado {
   return db.transaction((tx) => {
     const pedido = obtenerPedido(tx, id);
     if (pedido.estado === 'anulado') throw new ErrorDeUsuario(`El pedido #${pedido.numero} está anulado.`);
     if (pedido.cobrado) throw new ErrorDeUsuario(`El pedido #${pedido.numero} ya estaba cobrado.`);
     if (lista.length === 0) throw new ErrorDeUsuario('Elegí cómo paga.');
     const calculados = calcularPagos(lista, pedido.totalCentavos);
-    guardarPagos(tx, id, calculados);
+    guardarPagos(tx, id, calculados, cajaParaCobrar(tx), usuarioId);
     tx.update(pedidos).set({ cobrado: true, actualizadoEn: ahoraSql }).where(eq(pedidos.id, id)).run();
     return {
       id,

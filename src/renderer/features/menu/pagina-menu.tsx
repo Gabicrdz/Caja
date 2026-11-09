@@ -15,12 +15,15 @@ import { ListaProductos } from './lista-productos';
 import { PanelAgregados } from './panel-agregados';
 import { PanelCategorias, type Seleccion } from './panel-categorias';
 import { plural } from './textos';
+import { useUsuario } from '@/features/sesion/consultas';
 
 type Filtro = 'todos' | 'disponibles' | 'agotados';
 type Pestana = 'productos' | 'agregados';
 
 export function PaginaMenu() {
   const menu = useMenu();
+  const { esDueno } = useUsuario();
+  const soloLectura = !esDueno;
   const [pestana, setPestana] = useState<Pestana>('productos');
   const [seleccion, setSeleccion] = useState<Seleccion>('todas');
   const [busqueda, setBusqueda] = useState('');
@@ -86,7 +89,7 @@ export function PaginaMenu() {
                 (agotados > 0 ? ` · ${plural(agotados, 'agotado', 'agotados')}` : '')}
           </p>
         </div>
-        {categorias.length > 0 && (
+        {categorias.length > 0 && !soloLectura && (
           <div className="flex gap-2">
             {pestana === 'productos' ? (
               <>
@@ -106,7 +109,15 @@ export function PaginaMenu() {
         )}
       </header>
 
-      {categorias.length === 0 ? (
+      {soloLectura && (
+        <p role="status" className="mt-5 rounded-lg bg-secondary px-4 py-3 text-[15px]">
+          Solo el dueño puede cambiar el menú. Vos podés marcar productos como <strong>agotados</strong> (o volver a ponerlos disponibles).
+        </p>
+      )}
+
+      {categorias.length === 0 && soloLectura ? (
+        <p className="mt-10 text-tinta-suave">Todavía no hay productos en el menú.</p>
+      ) : categorias.length === 0 ? (
         <MenuVacio
           cargando={cargarEjemplo.isPending}
           alCrearCategoria={() => setDialogoCategoria({ categoria: null })}
@@ -130,6 +141,7 @@ export function PaginaMenu() {
               alSeleccionar={setSeleccion}
               alCrear={() => setDialogoCategoria({ categoria: null })}
               alRenombrar={(categoria) => setDialogoCategoria({ categoria })}
+              soloLectura={soloLectura}
             />
 
             <div className="flex min-w-0 flex-col gap-5">
@@ -185,6 +197,7 @@ export function PaginaMenu() {
                 <ListaProductos
                   secciones={secciones}
                   grupos={grupos}
+                  soloLectura={soloLectura}
                   alEditar={(producto) => setEditorProducto({ producto })}
                   alDarDeBaja={(p) =>
                     setConfirmacion({
@@ -199,6 +212,7 @@ export function PaginaMenu() {
               ) : (
                 <SinResultados
                   hayFiltros={hayFiltros}
+                  soloLectura={soloLectura}
                   menuSinProductos={productos.length === 0}
                   cargandoEjemplo={cargarEjemplo.isPending}
                   alCargarEjemplo={() => cargarEjemplo.mutate([])}
@@ -216,6 +230,7 @@ export function PaginaMenu() {
           <TabsContent value="agregados" className="mt-6">
             <PanelAgregados
               grupos={grupos}
+              soloLectura={soloLectura}
               alCrear={() => setEditorGrupo({ grupo: null })}
               alEditar={(grupo) => setEditorGrupo({ grupo })}
             />
@@ -317,6 +332,7 @@ function MenuVacio({
 
 function SinResultados({
   hayFiltros,
+  soloLectura,
   menuSinProductos,
   cargandoEjemplo,
   alCargarEjemplo,
@@ -325,6 +341,7 @@ function SinResultados({
   alCrear,
 }: {
   hayFiltros: boolean;
+  soloLectura: boolean;
   menuSinProductos: boolean;
   cargandoEjemplo: boolean;
   alCargarEjemplo: () => void;
@@ -347,7 +364,7 @@ function SinResultados({
           <p className="font-display text-xl font-semibold">
             {categoria ? `${categoria.nombre} todavía no tiene productos` : 'Todavía no hay productos'}
           </p>
-          <div className="flex flex-wrap justify-center gap-2">
+          <div className={cn('flex flex-wrap justify-center gap-2', soloLectura && 'hidden')}>
             <Button onClick={alCrear}>
               <Plus /> Nuevo producto
             </Button>
@@ -357,7 +374,7 @@ function SinResultados({
               </Button>
             )}
           </div>
-          {menuSinProductos && (
+          {menuSinProductos && !soloLectura && (
             <p className="max-w-sm text-[13px] text-tinta-suave">
               El ejemplo trae 24 productos y reutiliza las categorías que ya creaste con el mismo nombre.
             </p>

@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { BotonesImpresion } from './botones-impresion';
 import { useAnular, useCambiarEstado } from './consultas';
 import { destinoDe, siguientePaso } from './tarjeta-pedido';
+import { useUsuario } from '@/features/sesion/consultas';
 
 const ANTERIOR: Partial<Record<EstadoPedido, 'pendiente' | 'en_preparacion' | 'listo'>> = {
   en_preparacion: 'pendiente',
@@ -37,6 +38,7 @@ export function DialogoDetalle({
 }) {
   const cambiar = useCambiarEstado();
   const anular = useAnular();
+  const { esDueno } = useUsuario();
   const [anulando, setAnulando] = useState(false);
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState('');
@@ -179,9 +181,11 @@ export function DialogoDetalle({
         {p.estado !== 'anulado' && !anulando && (
           <DialogFooter className="justify-between">
             <div className="flex gap-1">
-              <Button variant="ghost-destructive" onClick={() => setAnulando(true)}>
-                <Ban /> Anular
-              </Button>
+              {esDueno && (
+                <Button variant="ghost-destructive" onClick={() => setAnulando(true)}>
+                  <Ban /> Anular
+                </Button>
+              )}
               {anterior && (
                 <Button variant="ghost" disabled={cambiar.isPending} onClick={() => cambiar.mutate({ id: p.id, estado: anterior })}>
                   <ArrowLeft /> Volver a {NOMBRE_ESTADO[anterior].toLowerCase()}

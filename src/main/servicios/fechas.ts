@@ -13,3 +13,8 @@ export function fechaLocal(fecha: Date = new Date()): string {
 export function horaLocal(fecha: Date = new Date()): string {
   return `${dosCifras(fecha.getHours())}:${dosCifras(fecha.getMinutes())}`;
 }
+
+/** 'AAAA-MM-DD HH:MM:SS' en hora local (para abrir y cerrar cajas). */
+export function momentoLocal(fecha: Date = new Date()): string {
+  return `${fechaLocal(fecha)} ${horaLocal(fecha)}:${dosCifras(fecha.getSeconds())}`;
+}

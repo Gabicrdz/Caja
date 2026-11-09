@@ -21,6 +21,7 @@ interface Props {
   alSeleccionar: (s: Seleccion) => void;
   alCrear: () => void;
   alRenombrar: (c: Categoria) => void;
+  soloLectura?: boolean;
 }
 
 export function PanelCategorias({
@@ -30,6 +31,7 @@ export function PanelCategorias({
   alSeleccionar,
   alCrear,
   alRenombrar,
+  soloLectura = false,
 }: Props) {
   const mover = useAccion(caja().categorias.mover);
   const cambiarEstado = useAccion(caja().categorias.cambiarEstado);
@@ -45,6 +47,7 @@ export function PanelCategorias({
         nombre={c.nombre}
         cantidad={c.cantidadProductos}
       />
+      {!soloLectura && (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -85,6 +88,7 @@ export function PanelCategorias({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+      )}
     </li>
   );
 
@@ -92,9 +96,11 @@ export function PanelCategorias({
     <aside aria-label="Categorías" className="flex flex-col gap-1">
       <div className="mb-2 flex items-center justify-between pl-3">
         <h2 className="text-[13px] font-semibold tracking-wide text-tinta-suave">Categorías</h2>
-        <Button variant="ghost" size="icon-sm" aria-label="Nueva categoría" onClick={alCrear}>
-          <Plus />
-        </Button>
+        {!soloLectura && (
+          <Button variant="ghost" size="icon-sm" aria-label="Nueva categoría" onClick={alCrear}>
+            <Plus />
+          </Button>
+        )}
       </div>
       <ul className="flex flex-col gap-0.5">
         <li>

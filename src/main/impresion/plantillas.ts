@@ -2,7 +2,14 @@
 // Son funciones puras: reciben el pedido y devuelven texto. Así se pueden
 // probar sin impresora y sin abrir Electron.
 import { pesos } from '@compartido/dinero';
-import { NOMBRE_MEDIO, NOMBRE_TIPO, type PedidoDetalle, type TipoImpresion } from '@compartido/tipos';
+import {
+  MEDIOS_DE_PAGO,
+  NOMBRE_MEDIO,
+  NOMBRE_MOVIMIENTO,
+  NOMBRE_TIPO,
+  type PedidoDetalle,
+  type ResumenCaja,
+} from '@compartido/tipos';
 
 /** Todo texto que escribió una persona pasa por acá antes de ir al HTML. */
 export function escapar(texto: string): string {
@@ -122,6 +129,58 @@ export function htmlTicket(p: PedidoDetalle, nombreLocal: string, anchoMm: 58 | 
   return documento(`Ticket #${p.numero}`, cuerpo, anchoMm);
 }
 
-export function htmlImpresion(tipo: TipoImpresion, p: PedidoDetalle, nombreLocal: string, anchoMm: 58 | 80): string | null {
+export function htmlImpresion(tipo: 'comanda' | 'ticket', p: PedidoDetalle, nombreLocal: string, anchoMm: 58 | 80): string | null {
   return tipo === 'comanda' ? htmlComanda(p, anchoMm) : htmlTicket(p, nombreLocal, anchoMm);
+}
+
+function fechaHora(momento: string): string {
+  return `${fechaCorta(momento.slice(0, 10))} ${momento.slice(11, 16)}`;
+}
+
+/** Cierre de caja (arqueo) para guardar junto con la plata contada. */
+export function htmlCierre(r: ResumenCaja, nombreLocal: string, anchoMm: 58 | 80): string {
+  const c = r.caja;
+  const fila = (a: string, b: string, clase = '') => `<div class="fila ${clase}"><span>${a}</span><span>${b}</span></div>`;
+  const diferencia = c.diferenciaCentavos ?? 0;
+  const cuerpo = `
+    <div class="centro grande">${escapar(nombreLocal)}</div>
+    <div class="centro negrita">CIERRE DE CAJA</div>
+    <div class="linea"></div>
+    ${fila('Apertura', `${fechaHora(c.abiertaEn)} · ${escapar(c.abiertaPor)}`)}
+    ${c.cerradaEn ? fila('Cierre', `${fechaHora(c.cerradaEn)} · ${escapar(c.cerradaPor ?? '')}`) : fila('Cierre', 'caja abierta')}
+    <div class="linea"></div>
+    <div class="negrita">Cobros por medio</div>
+    ${MEDIOS_DE_PAGO.filter((m) => r.porMedio[m].cobros > 0)
+      .map((m) => fila(`${NOMBRE_MEDIO[m]} (${r.porMedio[m].cobros})`, pesos(r.porMedio[m].montoCentavos)))
+      .join('')}
+    ${fila('Total cobrado', pesos(r.ventasCentavos), 'negrita')}
+    ${fila('Pedidos cobrados', String(r.pedidosCobrados))}
+    ${r.pedidosAnulados ? fila('Pedidos anulados', String(r.pedidosAnulados)) : ''}
+    ${r.sinCobrar.cantidad ? fila(`Sin cobrar (${r.sinCobrar.cantidad})`, pesos(r.sinCobrar.totalCentavos)) : ''}
+    <div class="linea"></div>
+    <div class="negrita">Efectivo</div>
+    ${fila('Fondo inicial', pesos(c.fondoCentavos))}
+    ${fila('+ Cobrado en efectivo', pesos(r.porMedio.efectivo.montoCentavos))}
+    ${r.ingresosCentavos ? fila('+ Ingresos', pesos(r.ingresosCentavos)) : ''}
+    ${r.retirosCentavos ? fila('− Retiros', pesos(r.retirosCentavos)) : ''}
+    ${r.gastosCentavos ? fila('− Gastos', pesos(r.gastosCentavos)) : ''}
+    ${fila('Efectivo esperado', pesos(c.esperadoCentavos ?? r.efectivoEsperadoCentavos), 'negrita')}
+    ${c.contadoCentavos !== null ? fila('Contado', pesos(c.contadoCentavos), 'negrita') : ''}
+    ${
+      c.contadoCentavos !== null
+        ? `<div class="caja centro grande">${diferencia === 0 ? 'Sin diferencia' : `${diferencia > 0 ? 'Sobrante' : 'Faltante'} ${pesos(Math.abs(diferencia))}`}</div>`
+        : ''
+    }
+    ${
+      r.movimientos.length
+        ? `<div class="linea"></div><div class="negrita">Movimientos</div>${r.movimientos
+            .map((m) => fila(`${m.hora} ${NOMBRE_MOVIMIENTO[m.tipo]}: ${escapar(m.motivo)}`, pesos(m.montoCentavos), 'chico'))
+            .join('')}`
+        : ''
+    }
+    ${c.nota ? `<div class="linea"></div><div>Nota: ${escapar(c.nota)}</div>` : ''}
+    <div class="linea"></div>
+    <div class="centro chico">Firma: ______________________</div>
+  `;
+  return documento(`Cierre de caja ${c.id}`, cuerpo, anchoMm);
 }

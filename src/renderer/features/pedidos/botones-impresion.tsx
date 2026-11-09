@@ -3,7 +3,7 @@ import type { TipoImpresion } from '@compartido/tipos';
 import { Button } from '@/components/ui/button';
 import { useImprimir } from './consultas';
 
-/** "Comanda: [Imprimir] [PDF]" o "Ticket: [Imprimir] [PDF]". */
+/** "Comanda: [Imprimir] [PDF]", "Ticket: …" o "Cierre: …" (en el cierre, el id es el de la caja). */
 export function BotonesImpresion({
   pedidoId,
   tipo,
@@ -14,7 +14,7 @@ export function BotonesImpresion({
   deshabilitado?: boolean;
 }) {
   const { imprimir, pdf, ocupado } = useImprimir();
-  const nombre = tipo === 'comanda' ? 'Comanda' : 'Ticket';
+  const nombre = { comanda: 'Comanda', ticket: 'Ticket', cierre: 'Cierre' }[tipo];
   return (
     <div className="flex items-center gap-1.5">
       <span className="mr-1 text-sm font-semibold text-tinta-suave">{nombre}</span>

@@ -19,11 +19,13 @@ import { plural } from './textos';
 interface Props {
   secciones: { categoria: Categoria; productos: Producto[] }[];
   grupos: GrupoAgregados[];
+  /** Cajero: ve el menú y marca agotados, pero no edita. */
+  soloLectura?: boolean;
   alEditar: (p: Producto) => void;
   alDarDeBaja: (p: Producto) => void;
 }
 
-export function ListaProductos({ secciones, grupos, alEditar, alDarDeBaja }: Props) {
+export function ListaProductos({ secciones, grupos, soloLectura = false, alEditar, alDarDeBaja }: Props) {
   return (
     <div className="flex flex-col gap-8">
       {secciones.map(({ categoria, productos }) => (
@@ -41,6 +43,7 @@ export function ListaProductos({ secciones, grupos, alEditar, alDarDeBaja }: Pro
                 key={p.id}
                 producto={p}
                 grupos={grupos}
+                soloLectura={soloLectura}
                 alEditar={() => alEditar(p)}
                 alDarDeBaja={() => alDarDeBaja(p)}
               />
@@ -55,11 +58,13 @@ export function ListaProductos({ secciones, grupos, alEditar, alDarDeBaja }: Pro
 function FilaProducto({
   producto: p,
   grupos,
+  soloLectura,
   alEditar,
   alDarDeBaja,
 }: {
   producto: Producto;
   grupos: GrupoAgregados[];
+  soloLectura: boolean;
   alEditar: () => void;
   alDarDeBaja: () => void;
 }) {
@@ -81,17 +86,23 @@ function FilaProducto({
           )}
           {/* El nombre es el botón; con "after" ocupa toda la fila para que
               se pueda tocar en cualquier parte y abrir el editor. */}
-          <button
-            type="button"
-            onClick={alEditar}
-            className={cn(
-              'truncate text-left font-display text-[17px] font-semibold tracking-tight outline-none',
-              'after:absolute after:inset-0 after:content-[""] focus-visible:underline',
-              !p.disponible && 'text-tinta-suave',
-            )}
-          >
-            {p.nombre}
-          </button>
+          {soloLectura ? (
+            <span className={cn('truncate font-display text-[17px] font-semibold tracking-tight', !p.disponible && 'text-tinta-suave')}>
+              {p.nombre}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={alEditar}
+              className={cn(
+                'truncate text-left font-display text-[17px] font-semibold tracking-tight outline-none',
+                'after:absolute after:inset-0 after:content-[""] focus-visible:underline',
+                !p.disponible && 'text-tinta-suave',
+              )}
+            >
+              {p.nombre}
+            </button>
+          )}
           {!p.vaACocina && (
             <Badge variant="contorno" title="No sale en la comanda de cocina">
               <ChefHat /> No va a cocina
@@ -134,7 +145,7 @@ function FilaProducto({
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-sm" className="relative z-10" aria-label={`Opciones de ${p.nombre}`}>
+          <Button variant="ghost" size="icon-sm" className={cn('relative z-10', soloLectura && 'invisible')} aria-label={`Opciones de ${p.nombre}`}>
             <Ellipsis />
           </Button>
         </DropdownMenuTrigger>

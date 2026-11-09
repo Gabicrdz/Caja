@@ -7,9 +7,10 @@ interface Props {
   grupos: GrupoAgregados[];
   alCrear: () => void;
   alEditar: (g: GrupoAgregados) => void;
+  soloLectura?: boolean;
 }
 
-export function PanelAgregados({ grupos, alCrear, alEditar }: Props) {
+export function PanelAgregados({ grupos, alCrear, alEditar, soloLectura = false }: Props) {
   if (grupos.length === 0) {
     return (
       <div className="mx-auto flex max-w-lg flex-col items-center gap-3 py-16 text-center">
@@ -19,7 +20,7 @@ export function PanelAgregados({ grupos, alCrear, alEditar }: Props) {
           extras de una hamburguesa, la guarnición de una milanesa. Lo armás una vez y lo usás en
           todos los productos que quieras.
         </p>
-        <Button className="mt-2" onClick={alCrear}>
+        <Button className={soloLectura ? 'hidden' : 'mt-2'} onClick={alCrear}>
           <Plus /> Crear grupo
         </Button>
       </div>
@@ -36,7 +37,7 @@ export function PanelAgregados({ grupos, alCrear, alEditar }: Props) {
                 {reglaDelGrupo(g)} · {g.cantidadProductos === 0 ? 'ningún producto lo usa' : `lo usan ${plural(g.cantidadProductos, 'producto', 'productos')}`}
               </p>
             </div>
-            <Button variant="ghost" size="icon-sm" aria-label={`Editar ${g.nombre}`} onClick={() => alEditar(g)}>
+            <Button variant="ghost" size="icon-sm" className={soloLectura ? 'invisible' : ''} aria-label={`Editar ${g.nombre}`} onClick={() => alEditar(g)}>
               <Pencil />
             </Button>
           </header>

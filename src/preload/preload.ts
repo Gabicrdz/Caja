@@ -6,6 +6,26 @@ import { CANALES, type ApiCaja } from '@compartido/api';
 const pedir = (canal: string, ...args: unknown[]) => ipcRenderer.invoke(canal, ...args);
 
 const api: ApiCaja = {
+  sesion: {
+    actual: () => pedir(CANALES.sesionActual),
+    iniciar: (usuarioId, pin) => pedir(CANALES.sesionIniciar, usuarioId, pin),
+    cerrar: () => pedir(CANALES.sesionCerrar),
+  },
+  usuarios: {
+    paraIngresar: () => pedir(CANALES.usuariosParaIngresar),
+    crearPrimero: (nombre, pin) => pedir(CANALES.usuariosCrearPrimero, nombre, pin),
+    listar: () => pedir(CANALES.usuariosListar),
+    guardar: (datos) => pedir(CANALES.usuariosGuardar, datos),
+    darDeBaja: (id) => pedir(CANALES.usuariosBaja, id),
+  },
+  caja: {
+    actual: () => pedir(CANALES.cajaActual),
+    abrir: (fondoCentavos) => pedir(CANALES.cajaAbrir, { fondoCentavos }),
+    movimiento: (datos) => pedir(CANALES.cajaMovimiento, datos),
+    cerrar: (datos) => pedir(CANALES.cajaCerrar, datos),
+    historial: () => pedir(CANALES.cajaHistorial),
+    resumen: (id) => pedir(CANALES.cajaResumen, id),
+  },
   menu: {
     obtener: () => pedir(CANALES.menuObtener),
     cargarEjemplo: () => pedir(CANALES.menuCargarEjemplo),

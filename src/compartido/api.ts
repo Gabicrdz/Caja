@@ -2,13 +2,17 @@
 // El preload lo implementa y la ventana lo usa con autocompletado.
 import type {
   DatosCategoria,
+  DatosCerrarCaja,
   DatosGrupo,
   DatosImpresion,
+  DatosMovimiento,
+  DatosUsuario,
   DatosPagos,
   DatosPedido,
   DatosProducto,
 } from './esquemas';
 import type {
+  Caja,
   Configuracion,
   EstadoPedido,
   Impresora,
@@ -16,11 +20,36 @@ import type {
   PedidoCreado,
   PedidoDetalle,
   Respuesta,
+  ResumenCaja,
   ResumenDelDia,
   TipoImpresion,
+  Usuario,
 } from './tipos';
 
 export interface ApiCaja {
+  sesion: {
+    actual(): Promise<Respuesta<Usuario | null>>;
+    iniciar(usuarioId: number, pin: string): Promise<Respuesta<Usuario>>;
+    cerrar(): Promise<Respuesta<null>>;
+  };
+  usuarios: {
+    /** Para la pantalla de ingreso: nombres y roles (sin PIN). */
+    paraIngresar(): Promise<Respuesta<Usuario[]>>;
+    /** Solo la primera vez: crea el dueño y entra. */
+    crearPrimero(nombre: string, pin: string): Promise<Respuesta<Usuario>>;
+    listar(): Promise<Respuesta<Usuario[]>>;
+    guardar(datos: DatosUsuario): Promise<Respuesta<number>>;
+    darDeBaja(id: number): Promise<Respuesta<null>>;
+  };
+  caja: {
+    /** null = no hay caja abierta. */
+    actual(): Promise<Respuesta<ResumenCaja | null>>;
+    abrir(fondoCentavos: number): Promise<Respuesta<Caja>>;
+    movimiento(datos: DatosMovimiento): Promise<Respuesta<null>>;
+    cerrar(datos: DatosCerrarCaja): Promise<Respuesta<ResumenCaja>>;
+    historial(): Promise<Respuesta<Caja[]>>;
+    resumen(id: number): Promise<Respuesta<ResumenCaja>>;
+  };
   menu: {
     obtener(): Promise<Respuesta<Menu>>;
     cargarEjemplo(): Promise<Respuesta<null>>;
@@ -51,7 +80,7 @@ export interface ApiCaja {
     cobrar(id: number, pagos: DatosPagos): Promise<Respuesta<PedidoCreado>>;
   };
   impresion: {
-    /** impreso = false si se canceló el diálogo de Windows. */
+    /** id = pedido (comanda, ticket) o caja (cierre). impreso = false si se canceló el diálogo. */
     imprimir(id: number, tipo: TipoImpresion): Promise<Respuesta<{ impreso: boolean }>>;
     /** Guarda el PDF en Documentos\Caja\Tickets, lo abre y devuelve la ruta. */
     pdf(id: number, tipo: TipoImpresion): Promise<Respuesta<{ ruta: string }>>;
@@ -68,6 +97,20 @@ export interface ApiCaja {
 
 /** Nombre de cada canal IPC: "seccion:accion". */
 export const CANALES = {
+  sesionActual: 'sesion:actual',
+  sesionIniciar: 'sesion:iniciar',
+  sesionCerrar: 'sesion:cerrar',
+  usuariosParaIngresar: 'usuarios:para-ingresar',
+  usuariosCrearPrimero: 'usuarios:crear-primero',
+  usuariosListar: 'usuarios:listar',
+  usuariosGuardar: 'usuarios:guardar',
+  usuariosBaja: 'usuarios:baja',
+  cajaActual: 'caja:actual',
+  cajaAbrir: 'caja:abrir',
+  cajaMovimiento: 'caja:movimiento',
+  cajaCerrar: 'caja:cerrar',
+  cajaHistorial: 'caja:historial',
+  cajaResumen: 'caja:resumen',
   menuObtener: 'menu:obtener',
   menuCargarEjemplo: 'menu:cargar-ejemplo',
   categoriaCrear: 'categorias:crear',

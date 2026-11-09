@@ -10,7 +10,7 @@ import type { Menu } from '../src/compartido/tipos';
 import * as menu from '../src/main/servicios/menu';
 import { cargarMenuDeEjemplo } from '../src/main/servicios/menu-ejemplo';
 import { anularPedido, cambiarEstado, cobrarPedido, crearPedido, listarPedidos, obtenerPedido, resumenDelDia } from '../src/main/servicios/pedidos';
-import { $, baseNueva } from './ayudantes';
+import { $, baseNueva, dueñoConCaja } from './ayudantes';
 
 let db: BaseDeDatos;
 let m: Menu;
@@ -19,6 +19,7 @@ beforeEach(() => {
   db = baseNueva();
   cargarMenuDeEjemplo(db);
   m = menu.obtenerMenu(db);
+  dueñoConCaja(db);
 });
 const id = (nombre: string) => m.productos.find((p) => p.nombre === nombre)!.id;
 

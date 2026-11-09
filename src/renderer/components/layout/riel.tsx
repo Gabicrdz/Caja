@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router';
 import {
   ChartColumn,
+  Lock,
   ReceiptText,
   Settings,
   ShoppingBag,
@@ -12,6 +13,8 @@ import {
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Marca } from './marca';
+import { useBloquear, useUsuario } from '@/features/sesion/consultas';
+import { Iniciales } from '@/features/sesion/pantalla-ingreso';
 
 interface Seccion {
   ruta: string;
@@ -24,12 +27,12 @@ interface Seccion {
 const SECCIONES: Seccion[] = [
   { ruta: '/vender', nombre: 'Vender', icono: ShoppingBag },
   { ruta: '/pedidos', nombre: 'Pedidos', icono: ReceiptText },
-  { ruta: '/caja', nombre: 'Caja', icono: Wallet, llegaEn: 'la etapa 4' },
+  { ruta: '/caja', nombre: 'Caja', icono: Wallet },
   { ruta: '/menu', nombre: 'Menú', icono: UtensilsCrossed },
   { ruta: '/reportes', nombre: 'Reportes', icono: ChartColumn, llegaEn: 'la etapa 5' },
 ];
 
-const AJUSTES: Seccion = { ruta: '/ajustes', nombre: 'Ajustes', icono: Settings, llegaEn: 'la etapa 6' };
+const AJUSTES: Seccion = { ruta: '/ajustes', nombre: 'Ajustes', icono: Settings };
 
 function Boton({ seccion }: { seccion: Seccion }) {
   const Icono = seccion.icono;
@@ -54,7 +57,7 @@ function Boton({ seccion }: { seccion: Seccion }) {
             {contenido}
           </span>
         </TooltipTrigger>
-        <TooltipContent side="right">Llega en {seccion.llegaEn}</TooltipContent>
+        <TooltipContent side="right">{seccion.llegaEn.startsWith('Solo') ? seccion.llegaEn : `Llega en ${seccion.llegaEn}`}</TooltipContent>
       </Tooltip>
     );
   }
@@ -94,7 +97,34 @@ function Reloj() {
   );
 }
 
+/** Quién está atendiendo, y el botón para bloquear (volver a la pantalla del PIN). */
+function Atendiendo() {
+  const { usuario } = useUsuario();
+  const bloquear = useBloquear();
+  if (!usuario) return null;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={() => bloquear.mutate()}
+          aria-label={`${usuario.nombre}: bloquear la caja`}
+          className="group flex w-full flex-col items-center gap-1 rounded-lg py-2 text-riel-texto outline-none hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-mostaza"
+        >
+          <span className="relative">
+            <Iniciales nombre={usuario.nombre} oscuro />
+            <Lock className="absolute -right-1 -bottom-1 size-4 rounded-full bg-riel p-0.5 text-mostaza" />
+          </span>
+          <span className="max-w-full truncate px-1 text-[11px] font-semibold">{usuario.nombre}</span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right">Bloquear (pedir PIN)</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function Riel() {
+  const { esDueno } = useUsuario();
   return (
     <nav
       aria-label="Secciones"
@@ -105,7 +135,8 @@ export function Riel() {
         <Boton key={s.ruta} seccion={s} />
       ))}
       <div className="mt-auto flex w-full flex-col items-center gap-4">
-        <Boton seccion={AJUSTES} />
+        <Boton seccion={esDueno ? AJUSTES : { ...AJUSTES, llegaEn: 'Solo el dueño' }} />
+        <Atendiendo />
         <Reloj />
       </div>
     </nav>

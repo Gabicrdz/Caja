@@ -49,6 +49,9 @@ interface Props {
   alGuardarSinCobrar?: () => Promise<PedidoCreado>;
   /** Texto del botón principal de la pantalla final. */
   textoTerminar?: string;
+  /** Sin caja abierta no se puede cobrar (sí "cobrar después"). */
+  cajaCerrada?: boolean;
+  alAbrirCaja?: () => void;
   alCerrar: () => void;
   alTerminar: (pedido: PedidoCreado) => void;
 }
@@ -60,6 +63,8 @@ export function DialogoCobro({
   alCobrar,
   alGuardarSinCobrar,
   textoTerminar = 'Nuevo pedido',
+  cajaCerrada = false,
+  alAbrirCaja,
   alCerrar,
   alTerminar,
 }: Props) {
@@ -131,7 +136,7 @@ export function DialogoCobro({
   }
 
   function confirmar() {
-    if (calculo.problema || guardando) return;
+    if (calculo.problema || guardando || cajaCerrada) return;
     void guardar(() =>
       alCobrar(
         calculo.pagos.map((p) => ({
@@ -260,6 +265,16 @@ export function DialogoCobro({
             </DialogBody>
 
             <DialogFooter className="flex-col items-stretch gap-3">
+              {cajaCerrada && (
+                <p role="status" className="flex items-center justify-between gap-3 rounded-lg bg-mostaza-suave px-4 py-3 text-[15px] font-medium text-[#7a5a00]">
+                  <span>La caja está cerrada: abrila para poder cobrar{alGuardarSinCobrar ? ', o guardá el pedido para cobrar después' : ''}.</span>
+                  {alAbrirCaja && (
+                    <Button size="sm" variant="oscuro" onClick={alAbrirCaja}>
+                      Abrir caja
+                    </Button>
+                  )}
+                </p>
+              )}
               {error && (
                 <p role="alert" className="flex items-start gap-2 rounded-lg bg-rojo-suave px-4 py-3 text-[15px] font-medium text-rojo">
                   <CircleAlert className="mt-0.5 size-[18px] shrink-0" /> {error}
@@ -288,7 +303,7 @@ export function DialogoCobro({
                       Volver
                     </Button>
                   )}
-                  <Button type="submit" size="lg" className="min-w-[200px]" disabled={Boolean(calculo.problema) || guardando}>
+                  <Button type="submit" size="lg" className="min-w-[200px]" disabled={Boolean(calculo.problema) || guardando || cajaCerrada}>
                     {guardando ? 'Guardando…' : 'Confirmar cobro'}
                   </Button>
                 </div>

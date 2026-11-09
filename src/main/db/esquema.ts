@@ -104,6 +104,8 @@ export const pedidos = sqliteTable('pedidos', {
   motivoAnulacion: text('motivo_anulacion').notNull().default(''),
   anuladoEn: text('anulado_en'),
   actualizadoEn: text('actualizado_en'),
+  usuarioId: integer('usuario_id').references(() => usuarios.id),
+  anuladoPor: integer('anulado_por').references(() => usuarios.id),
 });
 
 export const pedidoItems = sqliteTable('pedido_items', {
@@ -149,4 +151,45 @@ export const pagos = sqliteTable('pagos', {
   recibidoCentavos: integer('recibido_centavos').notNull(),
   vueltoCentavos: integer('vuelto_centavos').notNull().default(0),
   creadoEn: text('creado_en').notNull().default(ahora),
+  cajaId: integer('caja_id').references(() => cajas.id),
+  usuarioId: integer('usuario_id').references(() => usuarios.id),
+});
+
+export const usuarios = sqliteTable('usuarios', {
+  id: integer('id').primaryKey(),
+  nombre: text('nombre').notNull(),
+  rol: text('rol', { enum: ['dueno', 'cajero'] }).notNull(),
+  pinHash: text('pin_hash').notNull(),
+  pinSal: text('pin_sal').notNull(),
+  activo: integer('activo', { mode: 'boolean' }).notNull().default(true),
+  creadoEn: text('creado_en').notNull().default(ahora),
+});
+
+export const cajas = sqliteTable('cajas', {
+  id: integer('id').primaryKey(),
+  abiertaEn: text('abierta_en').notNull(),
+  abiertaPor: integer('abierta_por')
+    .notNull()
+    .references(() => usuarios.id),
+  fondoCentavos: integer('fondo_centavos').notNull(),
+  cerradaEn: text('cerrada_en'),
+  cerradaPor: integer('cerrada_por').references(() => usuarios.id),
+  esperadoCentavos: integer('esperado_centavos'),
+  contadoCentavos: integer('contado_centavos'),
+  diferenciaCentavos: integer('diferencia_centavos'),
+  nota: text('nota').notNull().default(''),
+});
+
+export const movimientosCaja = sqliteTable('movimientos_caja', {
+  id: integer('id').primaryKey(),
+  cajaId: integer('caja_id')
+    .notNull()
+    .references(() => cajas.id),
+  tipo: text('tipo', { enum: ['ingreso', 'retiro', 'gasto'] }).notNull(),
+  montoCentavos: integer('monto_centavos').notNull(),
+  motivo: text('motivo').notNull(),
+  usuarioId: integer('usuario_id')
+    .notNull()
+    .references(() => usuarios.id),
+  creadoEn: text('creado_en').notNull(),
 });
