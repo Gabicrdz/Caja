@@ -26,7 +26,11 @@ export function useCrearPedido() {
   const cliente = useQueryClient();
   return useMutation({
     mutationFn: (datos: DatosPedido) => desenvolver(caja().pedidos.crear(datos)),
-    onSuccess: () => cliente.invalidateQueries({ queryKey: CLAVE_RESUMEN }),
+    onSuccess: () =>
+      Promise.all([
+        cliente.invalidateQueries({ queryKey: CLAVE_RESUMEN }),
+        cliente.invalidateQueries({ queryKey: ['pedidos'] }),
+      ]),
     // Si falló porque cambió el menú, lo volvemos a pedir para mostrar lo nuevo.
     onError: () => cliente.invalidateQueries({ queryKey: CLAVE_MENU }),
   });

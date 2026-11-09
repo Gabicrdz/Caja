@@ -9,6 +9,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Estructura } from '@/components/layout/estructura';
 import { PaginaMenu } from '@/features/menu/pagina-menu';
 import { PaginaVender } from '@/features/vender/pagina-vender';
+import { PaginaPedidos } from '@/features/pedidos/pagina-pedidos';
 import './index.css';
 
 // La app instalada se abre desde un archivo (file://), por eso usamos el
@@ -20,6 +21,7 @@ const router = createHashRouter([
     children: [
       { index: true, element: <Navigate to="/vender" replace /> },
       { path: 'vender', element: <PaginaVender /> },
+      { path: 'pedidos', element: <PaginaPedidos /> },
       { path: 'menu', element: <PaginaMenu /> },
       { path: '*', element: <Navigate to="/vender" replace /> },
     ],

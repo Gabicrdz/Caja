@@ -157,4 +157,17 @@ export const MIGRACIONES: Migracion[] = [
       INSERT INTO configuracion (clave, valor) VALUES ('envio_centavos', '150000');
     `,
   },
+  {
+    nombre: 'Pedidos sin cobrar, anulaciones y configuración de impresión',
+    sql: /* sql */ `
+      -- 1 = cobrado al tomar el pedido; 0 = se cobra al entregar (delivery, mesa…).
+      ALTER TABLE pedidos ADD COLUMN cobrado INTEGER NOT NULL DEFAULT 1 CHECK (cobrado IN (0, 1));
+      ALTER TABLE pedidos ADD COLUMN motivo_anulacion TEXT NOT NULL DEFAULT '';
+      ALTER TABLE pedidos ADD COLUMN anulado_en TEXT;
+      ALTER TABLE pedidos ADD COLUMN actualizado_en TEXT;
+      CREATE INDEX pedidos_por_fecha_estado ON pedidos (fecha, estado);
+
+      INSERT INTO configuracion (clave, valor) VALUES ('impresora', ''), ('ancho_papel', '80');
+    `,
+  },
 ];

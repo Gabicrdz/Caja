@@ -11,6 +11,11 @@ import {
   esquemaGrupo,
   esquemaId,
   esquemaMoverCategoria,
+  esquemaEstado,
+  esquemaFecha,
+  esquemaImpresion,
+  esquemaMotivo,
+  esquemaPagos,
   esquemaPedido,
   esquemaProducto,
 } from '@compartido/esquemas';
@@ -19,8 +24,18 @@ import { obtenerDb } from './db/conexion';
 import { ErrorDeUsuario } from './servicios/errores';
 import * as menu from './servicios/menu';
 import { cargarMenuDeEjemplo } from './servicios/menu-ejemplo';
-import { crearPedido, resumenDelDia } from './servicios/pedidos';
-import { obtenerConfiguracion } from './servicios/configuracion';
+import {
+  anularPedido,
+  cambiarEstado,
+  cobrarPedido,
+  crearPedido,
+  listarPedidos,
+  obtenerPedido,
+  resumenDelDia,
+} from './servicios/pedidos';
+import { guardarImpresion, obtenerConfiguracion } from './servicios/configuracion';
+import { htmlImpresion } from './impresion/plantillas';
+import { guardarPdf, imprimirHtml, listarImpresoras } from './impresion/imprimir';
 
 /** Convierte cualquier error en un mensaje para la ventana. */
 export function mensajeDeError(error: unknown): string {
@@ -55,7 +70,33 @@ export function manejar<E extends ZodType<unknown[]>, T>(
   );
 }
 
+/** Igual que manejar, para tareas que tardan (imprimir, guardar un PDF). */
+export function manejarAsync<E extends ZodType<unknown[]>, T>(
+  canal: string,
+  esquema: E,
+  fn: (...args: z.output<E>) => Promise<T>,
+): void {
+  ipcMain.handle(canal, async (_evento, ...args: unknown[]): Promise<Respuesta<T>> => {
+    try {
+      return { ok: true, datos: await fn(...(esquema.parse(args) as z.output<E>)) };
+    } catch (error) {
+      return { ok: false, error: mensajeDeError(error) };
+    }
+  });
+}
+
 const sinArgumentos = z.tuple([]);
+const tipoImpresion = z.enum(['comanda', 'ticket']);
+
+/** Arma el HTML de la comanda o el ticket de un pedido, con la configuración actual. */
+function documentoDe(id: number, tipo: 'comanda' | 'ticket') {
+  const db = obtenerDb();
+  const pedido = obtenerPedido(db, id);
+  const config = obtenerConfiguracion(db);
+  const html = htmlImpresion(tipo, pedido, config.nombreLocal, config.anchoPapel);
+  if (!html) throw new ErrorDeUsuario(`El pedido #${pedido.numero} no tiene nada para la cocina (solo bebidas o productos que no se preparan).`);
+  return { html, pedido, config };
+}
 
 export function registrarCanales(info: () => { version: string; baseDeDatos: string }): void {
   const db = () => obtenerDb();
@@ -117,7 +158,35 @@ export function registrarCanales(info: () => { version: string; baseDeDatos: str
 
   manejar(CANALES.pedidoCrear, z.tuple([esquemaPedido]), (d) => crearPedido(db(), d));
   manejar(CANALES.pedidoResumenHoy, sinArgumentos, () => resumenDelDia(db()));
+  manejar(CANALES.pedidoListar, z.tuple([esquemaFecha]), (fecha) => listarPedidos(db(), { fecha }));
+  manejar(CANALES.pedidoEstado, z.tuple([z.number().int().positive(), esquemaEstado]), (id, estado) => {
+    cambiarEstado(db(), id, estado);
+    return null;
+  });
+  manejar(CANALES.pedidoAnular, z.tuple([z.number().int().positive(), esquemaMotivo]), (id, motivo) => {
+    anularPedido(db(), id, motivo);
+    return null;
+  });
+  manejar(CANALES.pedidoCobrar, z.tuple([z.number().int().positive(), esquemaPagos]), (id, pagos) =>
+    cobrarPedido(db(), id, pagos),
+  );
+
+  manejarAsync(CANALES.impresionImprimir, z.tuple([z.number().int().positive(), tipoImpresion]), async (id, tipo) => {
+    const { html, config } = documentoDe(id, tipo);
+    return { impreso: await imprimirHtml(html, config.anchoPapel, config.impresora) };
+  });
+  manejarAsync(CANALES.impresionPdf, z.tuple([z.number().int().positive(), tipoImpresion]), async (id, tipo) => {
+    const { html, pedido, config } = documentoDe(id, tipo);
+    const nombre = `${pedido.fecha}_pedido-${pedido.numero}_${tipo}.pdf`;
+    return { ruta: await guardarPdf(html, config.anchoPapel, nombre) };
+  });
+  manejarAsync(CANALES.impresionImpresoras, sinArgumentos, () => listarImpresoras());
+
   manejar(CANALES.configuracionObtener, sinArgumentos, () => obtenerConfiguracion(db()));
+  manejar(CANALES.configuracionImpresion, z.tuple([esquemaImpresion]), (d) => {
+    guardarImpresion(db(), d);
+    return null;
+  });
 
   manejar(CANALES.sistemaInfo, sinArgumentos, info);
 }

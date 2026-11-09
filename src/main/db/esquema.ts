@@ -100,6 +100,10 @@ export const pedidos = sqliteTable('pedidos', {
     .notNull()
     .default('pendiente'),
   creadoEn: text('creado_en').notNull().default(ahora),
+  cobrado: integer('cobrado', { mode: 'boolean' }).notNull().default(true),
+  motivoAnulacion: text('motivo_anulacion').notNull().default(''),
+  anuladoEn: text('anulado_en'),
+  actualizadoEn: text('actualizado_en'),
 });
 
 export const pedidoItems = sqliteTable('pedido_items', {

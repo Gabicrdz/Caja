@@ -29,9 +29,19 @@ const api: ApiCaja = {
   pedidos: {
     crear: (datos) => pedir(CANALES.pedidoCrear, datos),
     resumenDeHoy: () => pedir(CANALES.pedidoResumenHoy),
+    listar: (fecha) => pedir(CANALES.pedidoListar, fecha),
+    cambiarEstado: (id, estado) => pedir(CANALES.pedidoEstado, id, estado),
+    anular: (id, motivo) => pedir(CANALES.pedidoAnular, id, motivo),
+    cobrar: (id, pagos) => pedir(CANALES.pedidoCobrar, id, pagos),
+  },
+  impresion: {
+    imprimir: (id, tipo) => pedir(CANALES.impresionImprimir, id, tipo),
+    pdf: (id, tipo) => pedir(CANALES.impresionPdf, id, tipo),
+    impresoras: () => pedir(CANALES.impresionImpresoras),
   },
   configuracion: {
     obtener: () => pedir(CANALES.configuracionObtener),
+    guardarImpresion: (datos) => pedir(CANALES.configuracionImpresion, datos),
   },
   sistema: {
     info: () => pedir(CANALES.sistemaInfo),

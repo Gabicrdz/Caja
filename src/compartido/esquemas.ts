@@ -133,6 +133,18 @@ export type DatosGrupo = z.input<typeof esquemaGrupo>;
 const medio = z.enum(['efectivo', 'transferencia', 'debito', 'credito', 'qr']);
 const montoPositivo = z.number().int().positive('El monto tiene que ser mayor a cero.').max(PRECIO_MAXIMO);
 
+export const esquemaPagos = z
+  .array(
+    z.object({
+      medio,
+      montoCentavos: montoPositivo,
+      /** Solo efectivo: con cuánto pagó (para calcular el vuelto). */
+      recibidoCentavos: montoPositivo.optional(),
+    }),
+  )
+  .max(5, 'Hasta 5 pagos por pedido.');
+export type DatosPagos = z.input<typeof esquemaPagos>;
+
 export const esquemaPedido = z
   .object({
     tipo: z.enum(['mostrador', 'llevar', 'delivery', 'mesa']),
@@ -159,16 +171,8 @@ export const esquemaPedido = z
       )
       .min(1, 'El pedido está vacío.')
       .max(100, 'Un pedido tiene hasta 100 renglones.'),
-    pagos: z
-      .array(
-        z.object({
-          medio,
-          montoCentavos: montoPositivo,
-          /** Solo efectivo: con cuánto pagó (para calcular el vuelto). */
-          recibidoCentavos: montoPositivo.optional(),
-        }),
-      )
-      .max(5, 'Hasta 5 pagos por pedido.'),
+    /** Vacío = se guarda para cobrar después. */
+    pagos: esquemaPagos,
     /** El total que vio la persona al cobrar: si el menú cambió, no coincide. */
     totalEsperadoCentavos: z.number().int().min(0),
   })
@@ -181,3 +185,22 @@ export const esquemaPedido = z
     }
   });
 export type DatosPedido = z.input<typeof esquemaPedido>;
+
+export const esquemaFecha = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida.')
+  .refine((f) => !Number.isNaN(new Date(`${f}T12:00:00`).getTime()), 'Fecha inválida.');
+
+export const esquemaEstado = z.enum(['pendiente', 'en_preparacion', 'listo', 'entregado']);
+
+export const esquemaMotivo = z
+  .string()
+  .trim()
+  .min(3, 'Escribí el motivo (por ejemplo: "el cliente canceló").')
+  .max(140, 'Máximo 140 caracteres.');
+
+export const esquemaImpresion = z.object({
+  impresora: z.string().trim().max(200).default(''),
+  anchoPapel: z.union([z.literal(58), z.literal(80)]),
+});
+export type DatosImpresion = z.input<typeof esquemaImpresion>;

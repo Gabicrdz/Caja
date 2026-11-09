@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { ArrowRightLeft, Banknote, CircleAlert, CircleCheck, CreditCard, Plus, QrCode, X, type LucideIcon } from 'lucide-react';
-import type { DatosPedido } from '@compartido/esquemas';
+import type { DatosPagos } from '@compartido/esquemas';
 import { leerPesos, pesos, pesosParaCampo } from '@compartido/dinero';
-import { MEDIOS_DE_PAGO, NOMBRE_MEDIO, NOMBRE_TIPO, type MedioDePago, type PedidoCreado } from '@compartido/tipos';
+import { MEDIOS_DE_PAGO, NOMBRE_MEDIO, type MedioDePago, type PedidoCreado } from '@compartido/tipos';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { useCrearPedido } from './consultas';
+import { BotonesImpresion } from '@/features/pedidos/botones-impresion';
 
 const ICONOS: Record<MedioDePago, LucideIcon> = {
   efectivo: Banknote,
@@ -41,26 +41,54 @@ export function sugerenciasDeBilletes(totalCentavos: number): number[] {
 interface Props {
   abierto: boolean;
   totalCentavos: number;
-  /** Arma el pedido para mandar (sin los pagos). */
-  armarPedido: () => Omit<DatosPedido, 'pagos'>;
+  /** Línea debajo del título: "Mesa 4 · Ana", "Pedido #12"… */
+  subtitulo: string;
+  /** Guarda el cobro. Devuelve el pedido (con su número y vuelto). */
+  alCobrar: (pagos: DatosPagos) => Promise<PedidoCreado>;
+  /** Si viene, aparece "Cobrar después" (guarda el pedido sin pagos). */
+  alGuardarSinCobrar?: () => Promise<PedidoCreado>;
+  /** Texto del botón principal de la pantalla final. */
+  textoTerminar?: string;
   alCerrar: () => void;
-  alTerminar: () => void;
+  alTerminar: (pedido: PedidoCreado) => void;
 }
 
-export function DialogoCobro({ abierto, totalCentavos, armarPedido, alCerrar, alTerminar }: Props) {
+export function DialogoCobro({
+  abierto,
+  totalCentavos,
+  subtitulo,
+  alCobrar,
+  alGuardarSinCobrar,
+  textoTerminar = 'Nuevo pedido',
+  alCerrar,
+  alTerminar,
+}: Props) {
   const [filas, setFilas] = useState<FilaPago[]>([]);
   const [hecho, setHecho] = useState<PedidoCreado | null>(null);
-  const crear = useCrearPedido();
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState('');
   const campoRecibido = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (abierto) {
       setFilas([{ medio: 'efectivo', monto: '', recibido: '', automatico: true }]);
       setHecho(null);
-      crear.reset();
+      setError('');
+      setGuardando(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abierto]);
+
+  async function guardar(accion: () => Promise<PedidoCreado>) {
+    setGuardando(true);
+    setError('');
+    try {
+      setHecho(await accion());
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   const dividido = filas.length > 1;
   const calculo = useMemo(() => {
@@ -102,52 +130,42 @@ export function DialogoCobro({ abierto, totalCentavos, armarPedido, alCerrar, al
     });
   }
 
-  async function confirmar() {
-    if (calculo.problema || crear.isPending) return;
-    try {
-      const r = await crear.mutateAsync({
-        ...armarPedido(),
-        pagos: calculo.pagos.map((p) => ({
+  function confirmar() {
+    if (calculo.problema || guardando) return;
+    void guardar(() =>
+      alCobrar(
+        calculo.pagos.map((p) => ({
           medio: p.medio,
           montoCentavos: p.montoCentavos!,
           ...(p.medio === 'efectivo' ? { recibidoCentavos: p.recibidoCentavos! } : {}),
         })),
-      });
-      setHecho(r);
-    } catch {
-      // El mensaje se muestra abajo (crear.error).
-    }
+      ),
+    );
   }
-
-  const pedido = abierto ? armarPedido() : null;
 
   return (
     <Dialog
       open={abierto}
       onOpenChange={(abrir) => {
         if (abrir) return;
-        if (hecho) alTerminar();
+        if (hecho) alTerminar(hecho);
         else alCerrar();
       }}
     >
       <DialogContent className="max-w-[640px]" mostrarCerrar={!hecho}>
         {hecho ? (
-          <PedidoListo pedido={hecho} alTerminar={alTerminar} />
+          <PedidoListo pedido={hecho} texto={textoTerminar} alTerminar={() => alTerminar(hecho)} />
         ) : (
           <form
             className="flex min-h-0 flex-1 flex-col"
             onSubmit={(e) => {
               e.preventDefault();
-              void confirmar();
+              confirmar();
             }}
           >
             <DialogHeader>
               <DialogTitle>Cobrar</DialogTitle>
-              <p className="text-sm text-tinta-suave">
-                {pedido && NOMBRE_TIPO[pedido.tipo]}
-                {pedido?.tipo === 'mesa' && pedido.mesa ? ` ${pedido.mesa}` : ''}
-                {pedido?.clienteNombre ? ` · ${pedido.clienteNombre}` : ''}
-              </p>
+              <p className="text-sm text-tinta-suave">{subtitulo}</p>
             </DialogHeader>
             <DialogBody className="flex flex-col gap-6">
               <div className="flex items-end justify-between rounded-xl bg-[#f6f6f3] px-5 py-4">
@@ -242,9 +260,9 @@ export function DialogoCobro({ abierto, totalCentavos, armarPedido, alCerrar, al
             </DialogBody>
 
             <DialogFooter className="flex-col items-stretch gap-3">
-              {crear.error && (
+              {error && (
                 <p role="alert" className="flex items-start gap-2 rounded-lg bg-rojo-suave px-4 py-3 text-[15px] font-medium text-rojo">
-                  <CircleAlert className="mt-0.5 size-[18px] shrink-0" /> {crear.error.message}
+                  <CircleAlert className="mt-0.5 size-[18px] shrink-0" /> {error}
                 </p>
               )}
               <div className="flex items-center justify-between gap-4">
@@ -261,11 +279,17 @@ export function DialogoCobro({ abierto, totalCentavos, armarPedido, alCerrar, al
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="lg" onClick={alCerrar}>
-                    Volver
-                  </Button>
-                  <Button type="submit" size="lg" className="min-w-[200px]" disabled={Boolean(calculo.problema) || crear.isPending}>
-                    {crear.isPending ? 'Guardando…' : 'Confirmar cobro'}
+                  {alGuardarSinCobrar ? (
+                    <Button variant="outline" size="lg" disabled={guardando} onClick={() => void guardar(alGuardarSinCobrar)}>
+                      Cobrar después
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="lg" onClick={alCerrar}>
+                      Volver
+                    </Button>
+                  )}
+                  <Button type="submit" size="lg" className="min-w-[200px]" disabled={Boolean(calculo.problema) || guardando}>
+                    {guardando ? 'Guardando…' : 'Confirmar cobro'}
                   </Button>
                 </div>
               </div>
@@ -312,13 +336,15 @@ function CampoPesos({
   );
 }
 
-function PedidoListo({ pedido, alTerminar }: { pedido: PedidoCreado; alTerminar: () => void }) {
+function PedidoListo({ pedido, texto, alTerminar }: { pedido: PedidoCreado; texto: string; alTerminar: () => void }) {
   return (
     <div className="flex flex-col items-center gap-5 px-8 pt-10 pb-8 text-center">
-      <CircleCheck className="size-14 text-verde" strokeWidth={1.75} />
+      <CircleCheck className={cn('size-14', pedido.cobrado ? 'text-verde' : 'text-mostaza-fuerte')} strokeWidth={1.75} />
       <div className="flex flex-col gap-1">
         <DialogTitle className="text-3xl">Pedido #{pedido.numero}</DialogTitle>
-        <p className="text-tinta-suave">Cobrado {pesos(pedido.totalCentavos)}</p>
+        <p className="text-tinta-suave">
+          {pedido.cobrado ? `Cobrado ${pesos(pedido.totalCentavos)}` : `Guardado sin cobrar · ${pesos(pedido.totalCentavos)}`}
+        </p>
       </div>
       {pedido.vueltoCentavos > 0 && (
         <div className="flex w-full flex-col items-center gap-1 rounded-xl bg-mostaza px-6 py-5">
@@ -326,8 +352,12 @@ function PedidoListo({ pedido, alTerminar }: { pedido: PedidoCreado; alTerminar:
           <span className="numeros font-display text-5xl leading-none font-semibold tracking-tight">{pesos(pedido.vueltoCentavos)}</span>
         </div>
       )}
-      <Button size="lg" variant="oscuro" autoFocus className="mt-2 h-14 w-full text-[17px]" onClick={alTerminar}>
-        Nuevo pedido
+      <div className="flex w-full flex-col items-center gap-2 rounded-xl border border-linea px-4 py-3">
+        <BotonesImpresion pedidoId={pedido.id} tipo="comanda" />
+        <BotonesImpresion pedidoId={pedido.id} tipo="ticket" />
+      </div>
+      <Button size="lg" variant="oscuro" autoFocus className="mt-1 h-14 w-full text-[17px]" onClick={alTerminar}>
+        {texto}
       </Button>
     </div>
   );

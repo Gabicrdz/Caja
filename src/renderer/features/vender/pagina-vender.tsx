@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { Search, X } from 'lucide-react';
-import type { Producto } from '@compartido/tipos';
+import { NOMBRE_TIPO, type Producto } from '@compartido/tipos';
+import type { DatosPedido } from '@compartido/esquemas';
 import { pesos } from '@compartido/dinero';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,7 @@ import { cn, normalizar } from '@/lib/utils';
 import { useAccion, useMenu } from '@/features/menu/consultas';
 import { caja } from '@/lib/api';
 import { useCarrito, type ItemCarrito } from './carrito';
-import { useConfiguracion, useResumenDeHoy } from './consultas';
+import { useConfiguracion, useCrearPedido, useResumenDeHoy } from './consultas';
 import { DialogoArmar } from './dialogo-armar';
 import { DialogoCobro } from './dialogo-cobro';
 import { GrillaProductos } from './grilla-productos';
@@ -27,6 +28,7 @@ export function PaginaVender() {
   const [cobrando, setCobrando] = useState(false);
   const buscador = useRef<HTMLInputElement>(null);
   const cargarEjemplo = useAccion(caja().menu.cargarEjemplo, { exito: 'Menú de ejemplo cargado' });
+  const crearPedido = useCrearPedido();
 
   const envioPorDefecto = configuracion.data?.envioCentavos ?? 0;
   const totales = useTotales(menu.data, carrito.items, carrito.tipo, carrito.envioCentavos ?? envioPorDefecto);
@@ -87,6 +89,26 @@ export function PaginaVender() {
     window.addEventListener('keydown', tecla);
     return () => window.removeEventListener('keydown', tecla);
   }, [puedeCobrar, armando]);
+
+  /** Lo que se manda al main: qué se pidió (sin precios: los calcula el main). */
+  function armarPedido(): Omit<DatosPedido, 'pagos'> {
+    return {
+      tipo: carrito.tipo,
+      mesa: carrito.mesa,
+      clienteNombre: carrito.clienteNombre,
+      clienteTelefono: carrito.clienteTelefono,
+      clienteDireccion: carrito.clienteDireccion,
+      envioCentavos: totales.envioCentavos,
+      items: carrito.items.map(({ productoId, varianteId, opcionesIds, cantidad, nota }) => ({
+        productoId,
+        varianteId,
+        opcionesIds,
+        cantidad,
+        nota,
+      })),
+      totalEsperadoCentavos: totales.totalCentavos,
+    };
+  }
 
   if (menu.isPending) return <p className="p-10 text-tinta-suave">Cargando el menú…</p>;
   if (menu.isError) return <p className="p-10 text-rojo">No se pudo cargar el menú: {menu.error.message}</p>;
@@ -218,22 +240,13 @@ export function PaginaVender() {
       <DialogoCobro
         abierto={cobrando}
         totalCentavos={totales.totalCentavos}
-        armarPedido={() => ({
-          tipo: carrito.tipo,
-          mesa: carrito.mesa,
-          clienteNombre: carrito.clienteNombre,
-          clienteTelefono: carrito.clienteTelefono,
-          clienteDireccion: carrito.clienteDireccion,
-          envioCentavos: totales.envioCentavos,
-          items: carrito.items.map(({ productoId, varianteId, opcionesIds, cantidad, nota }) => ({
-            productoId,
-            varianteId,
-            opcionesIds,
-            cantidad,
-            nota,
-          })),
-          totalEsperadoCentavos: totales.totalCentavos,
-        })}
+        subtitulo={
+          NOMBRE_TIPO[carrito.tipo] +
+          (carrito.tipo === 'mesa' && carrito.mesa ? ` ${carrito.mesa}` : '') +
+          (carrito.clienteNombre ? ` · ${carrito.clienteNombre}` : '')
+        }
+        alCobrar={(pagos) => crearPedido.mutateAsync({ ...armarPedido(), pagos })}
+        alGuardarSinCobrar={() => crearPedido.mutateAsync({ ...armarPedido(), pagos: [] })}
         alCerrar={() => {
           setCobrando(false);
           enfocarBuscador();

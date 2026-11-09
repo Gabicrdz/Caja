@@ -71,12 +71,82 @@ export const NOMBRE_TIPO: Record<TipoPedido, string> = {
   mesa: 'Mesa',
 };
 
+export const ESTADOS_PEDIDO = ['pendiente', 'en_preparacion', 'listo', 'entregado', 'anulado'] as const;
+export type EstadoPedido = (typeof ESTADOS_PEDIDO)[number];
+
+export const NOMBRE_ESTADO: Record<EstadoPedido, string> = {
+  pendiente: 'Pendiente',
+  en_preparacion: 'En preparación',
+  listo: 'Listo',
+  entregado: 'Entregado',
+  anulado: 'Anulado',
+};
+
+export interface AgregadoDetalle {
+  grupoNombre: string;
+  nombre: string;
+  precioCentavos: number;
+}
+
+export interface ItemDetalle {
+  id: number;
+  nombre: string;
+  varianteNombre: string;
+  cantidad: number;
+  unitarioCentavos: number;
+  agregadosCentavos: number;
+  totalCentavos: number;
+  nota: string;
+  vaACocina: boolean;
+  agregados: AgregadoDetalle[];
+}
+
+export interface PagoDetalle {
+  medio: MedioDePago;
+  montoCentavos: number;
+  recibidoCentavos: number;
+  vueltoCentavos: number;
+}
+
+/** Un pedido completo, con sus renglones y pagos (para la pantalla Pedidos y la impresión). */
+export interface PedidoDetalle {
+  id: number;
+  numero: number;
+  fecha: string;
+  hora: string;
+  tipo: TipoPedido;
+  mesa: string;
+  clienteNombre: string;
+  clienteTelefono: string;
+  clienteDireccion: string;
+  nota: string;
+  subtotalCentavos: number;
+  envioCentavos: number;
+  totalCentavos: number;
+  estado: EstadoPedido;
+  cobrado: boolean;
+  motivoAnulacion: string;
+  items: ItemDetalle[];
+  pagos: PagoDetalle[];
+}
+
+export type TipoImpresion = 'comanda' | 'ticket';
+
+export interface Impresora {
+  /** Nombre que entiende Windows (el que se guarda). */
+  nombre: string;
+  /** Nombre lindo para mostrar. */
+  descripcion: string;
+}
+
 export interface PedidoCreado {
   id: number;
   /** Número del día (vuelve a 1 cada día): es el que se canta en el mostrador. */
   numero: number;
   totalCentavos: number;
   vueltoCentavos: number;
+  /** false = se guardó para cobrar después (delivery, mesa…). */
+  cobrado: boolean;
 }
 
 export interface ResumenDelDia {
@@ -88,6 +158,9 @@ export interface ResumenDelDia {
 export interface Configuracion {
   nombreLocal: string;
   envioCentavos: number;
+  /** Nombre de la impresora de tickets; '' = preguntar cada vez (diálogo de Windows). */
+  impresora: string;
+  anchoPapel: 58 | 80;
 }
 
 /** Toda respuesta del main tiene esta forma (igual que en los proyectos anteriores). */
