@@ -1,0 +1,139 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@fontsource-variable/bricolage-grotesque';
+@import '@fontsource-variable/figtree';
+
+/*
+  Diseño "mostrador": un riel oscuro a la izquierda (como el de una caja
+  registradora), el área de trabajo clara y UN solo color fuerte, el amarillo
+  mostaza, reservado para la acción principal de cada pantalla.
+  Bricolage Grotesque para títulos, nombres de productos y precios;
+  Figtree para todo lo demás.
+*/
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.625rem;
+
+  --fondo: #f3f4f1;
+  --superficie: #ffffff;
+  --tinta: #1b1c1e;
+  --tinta-suave: #5f6166;
+  --linea: #e1e2dd;
+  --linea-fuerte: #cfd0ca;
+  --riel: #1b1c1e;
+  --riel-texto: #a9aaa5;
+  --mostaza: #f2b705;
+  --mostaza-fuerte: #dba500;
+  --mostaza-suave: #fdf3d3;
+  --verde: #1d7a4c;
+  --verde-suave: #e3f2ea;
+  --rojo: #c1362b;
+  --rojo-suave: #fbe8e6;
+
+  /* Nombres que esperan los componentes de shadcn/ui */
+  --background: var(--fondo);
+  --foreground: var(--tinta);
+  --card: var(--superficie);
+  --card-foreground: var(--tinta);
+  --popover: var(--superficie);
+  --popover-foreground: var(--tinta);
+  --primary: var(--mostaza);
+  --primary-foreground: var(--tinta);
+  --secondary: #e9eae5;
+  --secondary-foreground: var(--tinta);
+  --muted: #eceee9;
+  --muted-foreground: var(--tinta-suave);
+  --accent: #eceee9;
+  --accent-foreground: var(--tinta);
+  --destructive: var(--rojo);
+  --border: var(--linea);
+  --input: var(--linea-fuerte);
+  --ring: var(--tinta);
+}
+
+@theme inline {
+  --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', 'Figtree Variable', sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-mostaza: var(--mostaza);
+  --color-mostaza-fuerte: var(--mostaza-fuerte);
+  --color-mostaza-suave: var(--mostaza-suave);
+  --color-riel: var(--riel);
+  --color-riel-texto: var(--riel-texto);
+  --color-superficie: var(--superficie);
+  --color-linea: var(--linea);
+  --color-linea-fuerte: var(--linea-fuerte);
+  --color-tinta: var(--tinta);
+  --color-tinta-suave: var(--tinta-suave);
+  --color-verde: var(--verde);
+  --color-verde-suave: var(--verde-suave);
+  --color-rojo: var(--rojo);
+  --color-rojo-suave: var(--rojo-suave);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #raiz {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 15px;
+    /* Es una aplicación, no una página: nada de seleccionar texto por error
+       al tocar rápido la pantalla. Los campos siguen siendo seleccionables. */
+    user-select: none;
+  }
+  input,
+  textarea {
+    user-select: text;
+  }
+  [hidden] {
+    display: none !important;
+  }
+}
+
+@layer utilities {
+  /* Números que no "bailan" al cambiar (todos los dígitos del mismo ancho). */
+  .numeros {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
