@@ -1,9 +1,10 @@
 // Proceso MAIN: arranca la app, abre la base de datos y crea la ventana.
-import { app, BrowserWindow, Menu, shell } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { abrirBaseDeDatos, cerrarBaseDeDatos, rutaBaseDeDatos } from './db/conexion';
 import { registrarCanales } from './ipc';
+import { copiaAlIniciar } from './copias';
 
 // Instalador de Windows: crea/borra accesos directos y se cierra.
 if (started) app.quit();
@@ -43,10 +44,9 @@ function crearVentana(): void {
       evento.preventDefault();
     }
   });
-  ventana.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://')) void shell.openExternal(url);
-    return { action: 'deny' };
-  });
+  // La Caja no tiene links a internet: cualquier intento de abrir una ventana
+  // nueva se rechaza (así nadie puede usar la ventana para abrir páginas).
+  ventana.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   ventana.once('ready-to-show', () => {
     ventana?.maximize();
@@ -73,6 +73,10 @@ app.whenReady().then(() => {
   abrirBaseDeDatos(path.join(app.getPath('userData'), 'caja.db'));
   registrarCanales(() => ({ version: app.getVersion(), baseDeDatos: rutaBaseDeDatos() }));
   crearVentana();
+  void copiaAlIniciar(); // una copia por día, sin frenar la apertura
+  // Muchos locales dejan la caja abierta días enteros: revisamos cada hora
+  // si ya cambió el día y hace falta la copia nueva.
+  setInterval(() => void copiaAlIniciar(), 60 * 60 * 1000);
 });
 
 app.on('window-all-closed', () => app.quit());

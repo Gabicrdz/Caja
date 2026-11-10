@@ -253,4 +253,13 @@ export const MIGRACIONES: Migracion[] = [
       DROP TABLE telefonos_viejos;
     `,
   },
+  {
+    nombre: 'Datos del local para el ticket (dirección, teléfono y mensaje final)',
+    sql: /* sql */ `
+      INSERT OR IGNORE INTO configuracion (clave, valor) VALUES
+        ('direccion_local', ''),
+        ('telefono_local', ''),
+        ('pie_ticket', '¡Gracias por tu compra!');
+    `,
+  },
 ];

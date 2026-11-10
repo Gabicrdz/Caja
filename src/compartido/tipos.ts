@@ -216,6 +216,10 @@ export interface ResumenDelDia {
 
 export interface Configuracion {
   nombreLocal: string;
+  direccionLocal: string;
+  telefonoLocal: string;
+  /** Mensaje al final del ticket ("¡Gracias por tu compra!"). */
+  pieTicket: string;
   envioCentavos: number;
   /** Nombre de la impresora de tickets; '' = preguntar cada vez (diálogo de Windows). */
   impresora: string;
@@ -223,6 +227,25 @@ export interface Configuracion {
 }
 
 /** Toda respuesta del main tiene esta forma (igual que en los proyectos anteriores). */
+// ---------- Copias de seguridad y demo (etapa 6) ----------
+export interface InfoCopia {
+  ruta: string;
+  nombre: string;
+  /** 'AAAA-MM-DD HH:MM' */
+  fecha: string;
+  bytes: number;
+}
+export interface EstadoCopias {
+  carpeta: string;
+  automaticas: InfoCopia[];
+  baseDeDatos: string;
+}
+/** Lo que se encontró en la copia elegida, para confirmar antes de restaurar. */
+export interface CopiaElegida {
+  nombre: string;
+  descripcion: string;
+}
+
 // ---------- Clientes (etapa 5) ----------
 export interface Cliente {
   id: number;

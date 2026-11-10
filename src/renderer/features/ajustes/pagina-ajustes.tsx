@@ -16,6 +16,9 @@ import { DialogoImpresion } from '@/features/pedidos/dialogo-impresion';
 import { useConfiguracion } from '@/features/vender/consultas';
 import { Iniciales } from '@/features/sesion/pantalla-ingreso';
 import { useUsuario } from '@/features/sesion/consultas';
+import { TarjetaCopias } from './tarjeta-copias';
+import { TarjetaDemo } from './tarjeta-demo';
+import { TarjetaLocal } from './tarjeta-local';
 
 const PERMISOS: Record<Rol, string> = {
   dueno: 'Todo: menú, precios, anular pedidos, retiros, usuarios y reportes.',
@@ -43,8 +46,10 @@ export function PaginaAjustes() {
     <div className="mx-auto flex max-w-[900px] flex-col gap-8 px-8 pt-7 pb-12">
       <header>
         <h1 className="font-display text-[34px] leading-none font-semibold tracking-tight">Ajustes</h1>
-        <p className="mt-2 text-tinta-suave">Usuarios e impresión. (El resto de los ajustes llega en la etapa 6.)</p>
+        <p className="mt-2 text-tinta-suave">Tu local, usuarios, impresión y copias de seguridad.</p>
       </header>
+
+      <TarjetaLocal />
 
       <section className="flex flex-col gap-3">
         <div className="flex items-end justify-between">
@@ -105,6 +110,10 @@ export function PaginaAjustes() {
           <Printer /> Configurar
         </Button>
       </section>
+
+      <TarjetaCopias />
+      <TarjetaDemo />
+      <AcercaDe />
 
       <DialogoUsuario abierto={editando !== null} usuario={editando?.usuario ?? null} alCerrar={() => setEditando(null)} />
       <DialogoImpresion abierto={impresion} alCerrar={() => setImpresion(false)} />
@@ -198,5 +207,16 @@ function DialogoUsuario({ abierto, usuario, alCerrar }: { abierto: boolean; usua
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Versión y dónde está la base (para abrirla con DB Browser). */
+function AcercaDe() {
+  const info = useQuery({ queryKey: ['sistema'], queryFn: () => desenvolver(caja().sistema.info()) });
+  if (!info.data) return null;
+  return (
+    <p className="text-center text-[13px] text-tinta-suave">
+      Caja versión {info.data.version} · Base de datos: <span className="break-all">{info.data.baseDeDatos}</span>
+    </p>
   );
 }

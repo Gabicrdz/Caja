@@ -27,11 +27,22 @@ function incluirEnElInstalador(archivo: string): boolean {
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    // Ícono del programa (Forge agrega .ico en Windows). Lo generamos a partir
+    // del logo: assets/icono.svg → icono.png (512 px) → icono.ico (16 a 256 px).
+    icon: './assets/icono',
+    executableName: 'Caja',
     // Devuelve true para lo que hay que DEJAR AFUERA del instalador.
     ignore: (archivo) => !incluirEnElInstalador(archivo),
   },
   rebuildConfig: {},
-  makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin'])],
+  makers: [
+    new MakerSquirrel({
+      name: 'caja',
+      setupExe: 'Caja-Instalador.exe',
+      setupIcon: './assets/icono.ico',
+    }),
+    new MakerZIP({}, ['darwin']),
+  ],
   plugins: [
     new VitePlugin({
       build: [

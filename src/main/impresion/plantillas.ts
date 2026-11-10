@@ -85,11 +85,30 @@ export function htmlComanda(p: PedidoDetalle, anchoMm: 58 | 80): string | null {
   return documento(`Comanda #${p.numero}`, cuerpo, anchoMm);
 }
 
+/** Lo que va arriba del ticket. Se puede pasar solo el nombre (pruebas viejas). */
+export interface DatosDelLocal {
+  nombre: string;
+  direccion?: string;
+  telefono?: string;
+  pie?: string;
+}
+type Local = string | DatosDelLocal;
+const comoLocal = (l: Local): DatosDelLocal => (typeof l === 'string' ? { nombre: l, pie: '¡Gracias!' } : l);
+
+function encabezado(local: Local): string {
+  const l = comoLocal(local);
+  return `
+    <div class="centro grande">${escapar(l.nombre)}</div>
+    ${l.direccion ? `<div class="centro chico">${escapar(l.direccion)}</div>` : ''}
+    ${l.telefono ? `<div class="centro chico">Tel. ${escapar(l.telefono)}</div>` : ''}`;
+}
+
 /** Ticket para el cliente: con precios, pagos y vuelto. No es factura. */
-export function htmlTicket(p: PedidoDetalle, nombreLocal: string, anchoMm: 58 | 80): string {
+export function htmlTicket(p: PedidoDetalle, local: Local, anchoMm: 58 | 80): string {
   const vuelto = p.pagos.reduce((s, x) => s + x.vueltoCentavos, 0);
+  const pie = comoLocal(local).pie;
   const cuerpo = `
-    <div class="centro grande">${escapar(nombreLocal)}</div>
+    ${encabezado(local)}
     <div class="centro">${fechaCorta(p.fecha)} · ${p.hora}</div>
     <div class="centro negrita">Pedido #${p.numero} · ${destino(p)}</div>
     ${p.clienteNombre ? `<div class="centro">${escapar(p.clienteNombre)}${p.clienteTelefono ? ` · ${escapar(p.clienteTelefono)}` : ''}</div>` : ''}
@@ -124,13 +143,13 @@ export function htmlTicket(p: PedidoDetalle, nombreLocal: string, anchoMm: 58 | 
     }
     <div class="linea"></div>
     <div class="centro chico">Comprobante no válido como factura</div>
-    <div class="centro negrita">¡Gracias!</div>
+    ${pie ? `<div class="centro negrita">${escapar(pie)}</div>` : ''}
   `;
   return documento(`Ticket #${p.numero}`, cuerpo, anchoMm);
 }
 
-export function htmlImpresion(tipo: 'comanda' | 'ticket', p: PedidoDetalle, nombreLocal: string, anchoMm: 58 | 80): string | null {
-  return tipo === 'comanda' ? htmlComanda(p, anchoMm) : htmlTicket(p, nombreLocal, anchoMm);
+export function htmlImpresion(tipo: 'comanda' | 'ticket', p: PedidoDetalle, local: Local, anchoMm: 58 | 80): string | null {
+  return tipo === 'comanda' ? htmlComanda(p, anchoMm) : htmlTicket(p, local, anchoMm);
 }
 
 function fechaHora(momento: string): string {
@@ -138,12 +157,12 @@ function fechaHora(momento: string): string {
 }
 
 /** Cierre de caja (arqueo) para guardar junto con la plata contada. */
-export function htmlCierre(r: ResumenCaja, nombreLocal: string, anchoMm: 58 | 80): string {
+export function htmlCierre(r: ResumenCaja, local: Local, anchoMm: 58 | 80): string {
   const c = r.caja;
   const fila = (a: string, b: string, clase = '') => `<div class="fila ${clase}"><span>${a}</span><span>${b}</span></div>`;
   const diferencia = c.diferenciaCentavos ?? 0;
   const cuerpo = `
-    <div class="centro grande">${escapar(nombreLocal)}</div>
+    ${encabezado(local)}
     <div class="centro negrita">CIERRE DE CAJA</div>
     <div class="linea"></div>
     ${fila('Apertura', `${fechaHora(c.abiertaEn)} · ${escapar(c.abiertaPor)}`)}

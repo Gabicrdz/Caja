@@ -71,6 +71,18 @@ const api: ApiCaja = {
   configuracion: {
     obtener: () => pedir(CANALES.configuracionObtener),
     guardarImpresion: (datos) => pedir(CANALES.configuracionImpresion, datos),
+    guardarLocal: (datos) => pedir(CANALES.configuracionLocal, datos),
+  },
+  copias: {
+    estado: () => pedir(CANALES.copiasEstado),
+    exportar: () => pedir(CANALES.copiasExportar),
+    elegir: () => pedir(CANALES.copiasElegir),
+    restaurar: () => pedir(CANALES.copiasRestaurar),
+    abrirCarpeta: () => pedir(CANALES.copiasAbrirCarpeta),
+  },
+  demo: {
+    disponible: () => pedir(CANALES.demoDisponible),
+    cargar: () => pedir(CANALES.demoCargar),
   },
   sistema: {
     info: () => pedir(CANALES.sistemaInfo),

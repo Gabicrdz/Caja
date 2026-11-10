@@ -8,6 +8,7 @@ import type {
   DatosRango,
   DatosGrupo,
   DatosImpresion,
+  DatosLocal,
   DatosMovimiento,
   DatosUsuario,
   DatosPagos,
@@ -18,8 +19,11 @@ import type {
   Caja,
   Cliente,
   Configuracion,
+  CopiaElegida,
+  EstadoCopias,
   EstadoPedido,
   Impresora,
+  InfoCopia,
   Menu,
   PedidoCreado,
   PedidoDetalle,
@@ -106,6 +110,24 @@ export interface ApiCaja {
   configuracion: {
     obtener(): Promise<Respuesta<Configuracion>>;
     guardarImpresion(datos: DatosImpresion): Promise<Respuesta<null>>;
+    /** Nombre, dirección, teléfono, mensaje del ticket y envío por defecto. Solo el dueño. */
+    guardarLocal(datos: DatosLocal): Promise<Respuesta<null>>;
+  };
+  /** Copias de seguridad (solo el dueño). */
+  copias: {
+    estado(): Promise<Respuesta<EstadoCopias>>;
+    /** Abre "Guardar como"; null si se canceló. */
+    exportar(): Promise<Respuesta<InfoCopia | null>>;
+    /** Abre "Abrir" y revisa el archivo; null si se canceló. */
+    elegir(): Promise<Respuesta<CopiaElegida | null>>;
+    /** Restaura la copia elegida y reinicia el programa. */
+    restaurar(): Promise<Respuesta<null>>;
+    abrirCarpeta(): Promise<Respuesta<null>>;
+  };
+  demo: {
+    /** Se puede cargar solo si no hay pedidos. */
+    disponible(): Promise<Respuesta<boolean>>;
+    cargar(): Promise<Respuesta<{ pedidos: number; dias: number; clientes: number }>>;
   };
   sistema: {
     info(): Promise<Respuesta<{ version: string; baseDeDatos: string }>>;
@@ -156,5 +178,13 @@ export const CANALES = {
   impresionImpresoras: 'impresion:impresoras',
   configuracionObtener: 'configuracion:obtener',
   configuracionImpresion: 'configuracion:impresion',
+  configuracionLocal: 'configuracion:local',
+  copiasEstado: 'copias:estado',
+  copiasExportar: 'copias:exportar',
+  copiasElegir: 'copias:elegir',
+  copiasRestaurar: 'copias:restaurar',
+  copiasAbrirCarpeta: 'copias:abrir-carpeta',
+  demoDisponible: 'demo:disponible',
+  demoCargar: 'demo:cargar',
   sistemaInfo: 'sistema:info',
 } as const;

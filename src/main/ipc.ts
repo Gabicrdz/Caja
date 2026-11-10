@@ -17,6 +17,7 @@ import {
   esquemaGrupo,
   esquemaImpresion,
   esquemaListarClientes,
+  esquemaLocal,
   esquemaMotivo,
   esquemaMovimiento,
   esquemaPagos,
@@ -26,7 +27,7 @@ import {
   esquemaRango,
   esquemaUsuario,
 } from '@compartido/esquemas';
-import type { Respuesta, Usuario } from '@compartido/tipos';
+import type { Configuracion, Respuesta, Usuario } from '@compartido/tipos';
 import { obtenerDb } from './db/conexion';
 import { ErrorDeUsuario } from './servicios/errores';
 import * as menu from './servicios/menu';
@@ -40,7 +41,9 @@ import {
   obtenerPedido,
   resumenDelDia,
 } from './servicios/pedidos';
-import { guardarImpresion, obtenerConfiguracion } from './servicios/configuracion';
+import { guardarImpresion, guardarLocal, obtenerConfiguracion } from './servicios/configuracion';
+import { cargarDemo, hayPedidos } from './servicios/demo';
+import { abrirCarpetaCopias, elegirCopia, estadoCopias, exportarCopia, restaurarCopiaElegida } from './copias';
 import { darDeBajaUsuario, guardarUsuario, hayUsuarios, listarUsuarios } from './servicios/usuarios';
 import { cerrarSesion, iniciarSesion, requerir, sesionActual } from './servicios/sesion';
 import { abrirCaja, cajaAbierta, cerrarCaja, historialDeCajas, registrarMovimiento, resumenDeCaja } from './servicios/caja';
@@ -98,16 +101,18 @@ const nada = z.tuple([]);
 const id = z.number().int().positive();
 const tipoImpresion = z.enum(['comanda', 'ticket', 'cierre']);
 
+const local = (c: Configuracion) => ({ nombre: c.nombreLocal, direccion: c.direccionLocal, telefono: c.telefonoLocal, pie: c.pieTicket });
+
 /** Arma el HTML de lo que haya que imprimir, con la configuración actual. */
 function documentoDe(idDocumento: number, tipo: 'comanda' | 'ticket' | 'cierre') {
   const db = obtenerDb();
   const config = obtenerConfiguracion(db);
   if (tipo === 'cierre') {
     const resumen = resumenDeCaja(db, idDocumento);
-    return { html: htmlCierre(resumen, config.nombreLocal, config.anchoPapel), nombre: `cierre-caja-${idDocumento}`, config };
+    return { html: htmlCierre(resumen, local(config), config.anchoPapel), nombre: `cierre-caja-${idDocumento}`, config };
   }
   const pedido = obtenerPedido(db, idDocumento);
-  const html = htmlImpresion(tipo, pedido, config.nombreLocal, config.anchoPapel);
+  const html = htmlImpresion(tipo, pedido, local(config), config.anchoPapel);
   if (!html) {
     throw new ErrorDeUsuario(`El pedido #${pedido.numero} no tiene nada para la cocina (solo bebidas o productos que no se preparan).`);
   }
@@ -230,6 +235,19 @@ export function registrarCanales(info: () => { version: string; baseDeDatos: str
 
   // ── Configuración y sistema ──
   manejar(CANALES.configuracionObtener, 'libre', nada, () => obtenerConfiguracion(db()));
+  manejar(CANALES.configuracionLocal, 'dueno', z.tuple([esquemaLocal]), (d) => {
+    guardarLocal(db(), d);
+    return null;
+  });
+
+  // ── Copias de seguridad y demo (solo el dueño) ──
+  manejar(CANALES.copiasEstado, 'dueno', nada, () => estadoCopias());
+  manejar(CANALES.copiasExportar, 'dueno', nada, () => exportarCopia());
+  manejar(CANALES.copiasElegir, 'dueno', nada, () => elegirCopia());
+  manejar(CANALES.copiasRestaurar, 'dueno', nada, () => restaurarCopiaElegida());
+  manejar(CANALES.copiasAbrirCarpeta, 'dueno', nada, () => abrirCarpetaCopias());
+  manejar(CANALES.demoDisponible, 'dueno', nada, () => !hayPedidos(db()));
+  manejar(CANALES.demoCargar, 'dueno', nada, (usuario) => cargarDemo(db(), usuario));
   manejar(CANALES.configuracionImpresion, 'dueno', z.tuple([esquemaImpresion]), (d) => {
     guardarImpresion(db(), d);
     return sinDatos();

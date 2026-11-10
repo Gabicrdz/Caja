@@ -276,3 +276,13 @@ export const esquemaRango = z
     { message: `Elegí un período de hasta ${MAXIMO_DIAS_REPORTE} días.`, path: ['hasta'] },
   );
 export type DatosRango = z.input<typeof esquemaRango>;
+
+// ---------- Datos del local (etapa 6) ----------
+export const esquemaLocal = z.object({
+  nombreLocal: z.string().trim().min(1, 'Poné el nombre del local.').max(40, 'Nombre: máximo 40 caracteres.'),
+  direccionLocal: textoOpcional(80),
+  telefonoLocal: textoOpcional(40),
+  pieTicket: textoOpcional(80),
+  envioCentavos: z.number().int().min(0, 'El envío no puede ser negativo.').max(PRECIO_MAXIMO),
+});
+export type DatosLocal = z.input<typeof esquemaLocal>;
