@@ -16,6 +16,7 @@ import { DialogoImpresion } from '@/features/pedidos/dialogo-impresion';
 import { useConfiguracion } from '@/features/vender/consultas';
 import { Iniciales } from '@/features/sesion/pantalla-ingreso';
 import { useUsuario } from '@/features/sesion/consultas';
+import { TarjetaArca } from './tarjeta-arca';
 import { TarjetaCopias } from './tarjeta-copias';
 import { TarjetaDemo } from './tarjeta-demo';
 import { TarjetaLocal } from './tarjeta-local';
@@ -110,6 +111,8 @@ export function PaginaAjustes() {
           <Printer /> Configurar
         </Button>
       </section>
+
+      <TarjetaArca />
 
       <TarjetaCopias />
       <TarjetaDemo />

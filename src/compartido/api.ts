@@ -7,6 +7,7 @@ import type {
   DatosListarClientes,
   DatosRango,
   DatosGrupo,
+  DatosArca,
   DatosImpresion,
   DatosLocal,
   DatosMovimiento,
@@ -20,9 +21,11 @@ import type {
   Cliente,
   Configuracion,
   CopiaElegida,
+  EstadoArca,
   EstadoCopias,
   EstadoPedido,
   Impresora,
+  PasoPruebaArca,
   InfoCopia,
   Menu,
   PedidoCreado,
@@ -113,6 +116,15 @@ export interface ApiCaja {
     /** Nombre, dirección, teléfono, mensaje del ticket y envío por defecto. Solo el dueño. */
     guardarLocal(datos: DatosLocal): Promise<Respuesta<null>>;
   };
+  /** Facturación electrónica con ARCA (solo el dueño). */
+  arca: {
+    estado(): Promise<Respuesta<EstadoArca>>;
+    guardar(datos: DatosArca): Promise<Respuesta<null>>;
+    /** Abre "Elegir archivo"; false si se canceló. Va a la carpeta del ambiente indicado. */
+    elegirArchivo(archivo: 'certificado' | 'clave', ambiente: 'homologacion' | 'produccion'): Promise<Respuesta<boolean>>;
+    /** Recorre la conexión paso a paso y dice dónde falla. */
+    probar(): Promise<Respuesta<PasoPruebaArca[]>>;
+  };
   /** Copias de seguridad (solo el dueño). */
   copias: {
     estado(): Promise<Respuesta<EstadoCopias>>;
@@ -186,5 +198,9 @@ export const CANALES = {
   copiasAbrirCarpeta: 'copias:abrir-carpeta',
   demoDisponible: 'demo:disponible',
   demoCargar: 'demo:cargar',
+  arcaEstado: 'arca:estado',
+  arcaGuardar: 'arca:guardar',
+  arcaElegirArchivo: 'arca:elegir-archivo',
+  arcaProbar: 'arca:probar',
   sistemaInfo: 'sistema:info',
 } as const;

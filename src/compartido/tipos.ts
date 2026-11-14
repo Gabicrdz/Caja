@@ -226,6 +226,29 @@ export interface Configuracion {
   anchoPapel: 58 | 80;
 }
 
+export type AmbienteArca = 'homologacion' | 'produccion';
+export type CondicionIvaEmisor = 'monotributo' | 'responsable_inscripto';
+
+/** Lo que la ventana ve de la facturación con ARCA. Nunca llegan el certificado ni la clave, solo si están. */
+export interface EstadoArca {
+  activa: boolean;
+  ambiente: AmbienteArca;
+  cuit: string;
+  puntoVenta: number;
+  condicionIva: CondicionIvaEmisor;
+  /** Hay un certificado (.crt) cargado para este ambiente. */
+  tieneCertificado: boolean;
+  tieneClave: boolean;
+  /** Cuándo vence el certificado cargado (AAAA-MM-DD), o null. */
+  vencimientoCertificado: string | null;
+}
+
+export interface PasoPruebaArca {
+  paso: string;
+  ok: boolean;
+  detalle: string;
+}
+
 /** Toda respuesta del main tiene esta forma (igual que en los proyectos anteriores). */
 // ---------- Copias de seguridad y demo (etapa 6) ----------
 export interface InfoCopia {

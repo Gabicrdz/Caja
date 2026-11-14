@@ -2,6 +2,7 @@
 // Zod las revisa en el main (nunca confiamos en lo que manda la ventana) y
 // TypeScript saca de acá los tipos, así la ventana y el main hablan igual.
 import { z } from 'zod';
+import { cuitValido, soloNumeros } from './cuit';
 
 export const PRECIO_MAXIMO = 100_000_000_00; // cien millones de pesos, en centavos
 
@@ -286,3 +287,16 @@ export const esquemaLocal = z.object({
   envioCentavos: z.number().int().min(0, 'El envío no puede ser negativo.').max(PRECIO_MAXIMO),
 });
 export type DatosLocal = z.input<typeof esquemaLocal>;
+
+export const esquemaArca = z.object({
+  activa: z.boolean(),
+  ambiente: z.enum(['homologacion', 'produccion']),
+  cuit: z
+    .string()
+    .transform(soloNumeros)
+    .refine((c) => c === '' || cuitValido(c), 'El CUIT no es válido. Revisá que esté bien escrito.'),
+  puntoVenta: z.number().int('El punto de venta es un número entero.').min(1, 'El punto de venta va de 1 a 99999.').max(99999, 'El punto de venta va de 1 a 99999.'),
+  condicionIva: z.enum(['monotributo', 'responsable_inscripto']),
+});
+export type DatosArca = z.input<typeof esquemaArca>;
+export const esquemaArchivoArca = z.enum(['certificado', 'clave']);

@@ -8,6 +8,8 @@ import { z, type ZodType } from 'zod';
 import { CANALES } from '@compartido/api';
 import {
   esquemaAbrirCaja,
+  esquemaArca,
+  esquemaArchivoArca,
   esquemaBusqueda,
   esquemaCategoria,
   esquemaCerrarCaja,
@@ -42,6 +44,7 @@ import {
   resumenDelDia,
 } from './servicios/pedidos';
 import { guardarImpresion, guardarLocal, obtenerConfiguracion } from './servicios/configuracion';
+import { elegirArchivoArca, estadoArca, guardarArca, probarArca } from './arca/integracion';
 import { cargarDemo, hayPedidos } from './servicios/demo';
 import { abrirCarpetaCopias, elegirCopia, estadoCopias, exportarCopia, restaurarCopiaElegida } from './copias';
 import { darDeBajaUsuario, guardarUsuario, hayUsuarios, listarUsuarios } from './servicios/usuarios';
@@ -99,6 +102,7 @@ export function manejar<E extends ZodType<unknown[]>, T>(
 
 const nada = z.tuple([]);
 const id = z.number().int().positive();
+const ambienteArca = z.enum(['homologacion', 'produccion']);
 const tipoImpresion = z.enum(['comanda', 'ticket', 'cierre']);
 
 const local = (c: Configuracion) => ({ nombre: c.nombreLocal, direccion: c.direccionLocal, telefono: c.telefonoLocal, pie: c.pieTicket });
@@ -239,6 +243,15 @@ export function registrarCanales(info: () => { version: string; baseDeDatos: str
     guardarLocal(db(), d);
     return null;
   });
+
+  // ── Facturación con ARCA (solo el dueño) ──
+  manejar(CANALES.arcaEstado, 'dueno', nada, () => estadoArca(db()));
+  manejar(CANALES.arcaGuardar, 'dueno', z.tuple([esquemaArca]), (d) => {
+    guardarArca(db(), d);
+    return null;
+  });
+  manejar(CANALES.arcaElegirArchivo, 'dueno', z.tuple([esquemaArchivoArca, ambienteArca]), (archivo, ambiente) => elegirArchivoArca(archivo, ambiente));
+  manejar(CANALES.arcaProbar, 'dueno', nada, () => probarArca(db()));
 
   // ── Copias de seguridad y demo (solo el dueño) ──
   manejar(CANALES.copiasEstado, 'dueno', nada, () => estadoCopias());

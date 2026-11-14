@@ -73,6 +73,12 @@ const api: ApiCaja = {
     guardarImpresion: (datos) => pedir(CANALES.configuracionImpresion, datos),
     guardarLocal: (datos) => pedir(CANALES.configuracionLocal, datos),
   },
+  arca: {
+    estado: () => pedir(CANALES.arcaEstado),
+    guardar: (datos) => pedir(CANALES.arcaGuardar, datos),
+    elegirArchivo: (archivo, ambiente) => pedir(CANALES.arcaElegirArchivo, archivo, ambiente),
+    probar: () => pedir(CANALES.arcaProbar),
+  },
   copias: {
     estado: () => pedir(CANALES.copiasEstado),
     exportar: () => pedir(CANALES.copiasExportar),
