@@ -1,15 +1,17 @@
 // Guardar un pedido cobrado. La ventana manda QUÉ se pidió (ids, cantidades,
 // pagos); los precios los vuelve a calcular el main con el menú de la base.
 // Nunca confiamos en un precio que venga de la ventana.
-import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { BaseDeDatos } from '../db/conexion';
-import { pagos, pedidoItemAgregados, pedidoItems, pedidos } from '../db/esquema';
+import { comprobantes, facturasPendientes, pagos, pedidoItemAgregados, pedidoItems, pedidos } from '../db/esquema';
+import { NOMBRE_COMPROBANTE } from '../arca/tipos';
 import type { esquemaEstado, esquemaPagos, esquemaPedido } from '@compartido/esquemas';
 import { armarLinea, type Linea } from '@compartido/precios';
 import { pesos } from '@compartido/dinero';
 import {
   NOMBRE_MEDIO,
+  type ComprobanteResumen,
   type PedidoCreado,
   type PedidoDetalle,
   type ResumenDelDia,
@@ -233,6 +235,31 @@ export function listarPedidos(db: Pick<BaseDeDatos, 'select'>, filtro: { fecha: 
         .all()
     : [];
   const listaPagos = db.select().from(pagos).where(inArray(pagos.pedidoId, ids)).orderBy(asc(pagos.id)).all();
+  // Facturas y notas de crédito (las que tienen un comprobante asociado), y facturas pendientes.
+  const todosLosComprobantes = db.select().from(comprobantes).where(inArray(comprobantes.pedidoId, ids)).orderBy(asc(comprobantes.id)).all();
+  const facturas = todosLosComprobantes.filter((c) => c.asociadoId === null);
+  const notas = todosLosComprobantes.filter((c) => c.asociadoId !== null);
+  const resumir = (c: (typeof todosLosComprobantes)[number] | undefined): ComprobanteResumen | null =>
+    c
+      ? {
+          id: c.id,
+          tipo: c.tipo,
+          nombre: NOMBRE_COMPROBANTE[c.tipo] ?? `Comprobante ${c.tipo}`,
+          puntoVenta: c.puntoVenta,
+          numero: c.numero,
+          numeroCompleto: `${String(c.puntoVenta).padStart(4, '0')}-${String(c.numero).padStart(8, '0')}`,
+          fecha: c.fecha,
+          totalCentavos: c.totalCentavos,
+          cae: c.cae,
+          vencimientoCae: c.vencimientoCae,
+          docTipo: c.docTipo,
+          docNro: c.docNro,
+          condicionIvaReceptor: c.condicionIvaReceptor,
+          ambiente: c.ambiente,
+          cuitEmisor: c.cuitEmisor,
+        }
+      : null;
+  const pendientes = db.select().from(facturasPendientes).where(inArray(facturasPendientes.pedidoId, ids)).all();
 
   return filas.map((f) => ({
     id: f.id,
@@ -275,6 +302,9 @@ export function listarPedidos(db: Pick<BaseDeDatos, 'select'>, filtro: { fecha: 
         recibidoCentavos: p.recibidoCentavos,
         vueltoCentavos: p.vueltoCentavos,
       })),
+    comprobante: resumir(facturas.find((x) => x.pedidoId === f.id)),
+    notaDeCredito: resumir(notas.find((x) => x.pedidoId === f.id)),
+    facturaPendiente: pendientes.find((x) => x.pedidoId === f.id)?.ultimoError ?? null,
   }));
 }
 
@@ -302,10 +332,22 @@ export function cambiarEstado(db: BaseDeDatos, id: number, estado: z.output<type
 }
 
 /** Anular no borra: el pedido queda con su motivo y deja de sumar en el día. */
-export function anularPedido(db: BaseDeDatos, id: number, motivo: string, usuarioId: number | null = null): void {
+export function anularPedido(
+  db: BaseDeDatos,
+  id: number,
+  motivo: string,
+  usuarioId: number | null = null,
+  /** Solo lo usa la nota de crédito: la factura ya quedó anulada en ARCA. */
+  conNotaDeCredito = false,
+): void {
   db.transaction((tx) => {
     const pedido = obtenerPedido(tx, id);
     if (pedido.estado === 'anulado') throw new ErrorDeUsuario(`El pedido #${pedido.numero} ya estaba anulado.`);
+    if (pedido.comprobante && !conNotaDeCredito) {
+      throw new ErrorDeUsuario(
+        `El pedido #${pedido.numero} tiene la ${pedido.comprobante.nombre} ${pedido.comprobante.numeroCompleto}. Una factura no se borra: hay que anularla con una nota de crédito.`,
+      );
+    }
     tx.update(pedidos)
       .set({ estado: 'anulado', motivoAnulacion: motivo, anuladoEn: ahoraSql, actualizadoEn: ahoraSql, anuladoPor: usuarioId })
       .where(eq(pedidos.id, id))

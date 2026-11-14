@@ -26,6 +26,9 @@ export function TarjetaArca() {
   const [cuit, setCuit] = useState('');
   const [punto, setPunto] = useState('1');
   const [condicion, setCondicion] = useState<CondicionIvaEmisor>('monotributo');
+  const [razonSocial, setRazonSocial] = useState('');
+  const [ingresosBrutos, setIngresosBrutos] = useState('');
+  const [inicio, setInicio] = useState('');
   const [error, setError] = useState('');
   const [pasos, setPasos] = useState<PasoPruebaArca[] | null>(null);
 
@@ -37,6 +40,9 @@ export function TarjetaArca() {
     setCuit(e.cuit ? cuitConGuiones(e.cuit) : '');
     setPunto(String(e.puntoVenta));
     setCondicion(e.condicionIva);
+    setRazonSocial(e.razonSocial);
+    setIngresosBrutos(e.ingresosBrutos);
+    setInicio(e.inicioActividades);
   }, [e]);
 
   const guardar = useMutation({
@@ -68,14 +74,14 @@ export function TarjetaArca() {
 
   function enviar(ev: FormEvent) {
     ev.preventDefault();
-    const r = esquemaArca.safeParse({ activa, ambiente, cuit, puntoVenta: Number(punto), condicionIva: condicion });
+    const r = esquemaArca.safeParse({ activa, ambiente, cuit, puntoVenta: Number(punto), condicionIva: condicion, razonSocial, ingresosBrutos, inicioActividades: inicio });
     if (!r.success) return setError(r.error.issues[0]?.message ?? 'Revisá los datos.');
     if (r.data.activa && !r.data.cuit) return setError('Para facturar hace falta el CUIT.');
     setError('');
     guardar.mutate(r.data);
   }
 
-  const hayCambio = !!e && (activa !== e.activa || ambiente !== e.ambiente || cuit.replace(/\D/g, '') !== e.cuit || Number(punto) !== e.puntoVenta || condicion !== e.condicionIva);
+  const hayCambio = !!e && (activa !== e.activa || ambiente !== e.ambiente || cuit.replace(/\D/g, '') !== e.cuit || Number(punto) !== e.puntoVenta || condicion !== e.condicionIva || razonSocial.trim() !== e.razonSocial || ingresosBrutos.trim() !== e.ingresosBrutos || inicio !== e.inicioActividades);
   // Los archivos se guardan por ambiente: si se cambió el ambiente sin guardar, primero se guarda.
   const ambienteSinGuardar = !!e && ambiente !== e.ambiente;
   const listo = !!e && e.tieneCertificado && e.tieneClave && !!e.cuit;
@@ -121,6 +127,17 @@ export function TarjetaArca() {
         </Campo>
         <Campo etiqueta="Punto de venta" htmlFor="arca-punto" ayuda="El que se creó en ARCA para facturar por web service.">
           <Input id="arca-punto" inputMode="numeric" maxLength={5} value={punto} onChange={(ev) => setPunto(ev.target.value.replace(/\D/g, ''))} />
+        </Campo>
+        <div className="col-span-2">
+          <Campo etiqueta="Nombre o razón social (como figura en ARCA)" htmlFor="arca-razon" ayuda="Va impreso arriba de cada factura.">
+            <Input id="arca-razon" maxLength={80} value={razonSocial} onChange={(ev) => setRazonSocial(ev.target.value)} />
+          </Campo>
+        </div>
+        <Campo etiqueta="Ingresos Brutos" htmlFor="arca-iibb" ayuda='Número de inscripción o "Exento".'>
+          <Input id="arca-iibb" maxLength={30} value={ingresosBrutos} onChange={(ev) => setIngresosBrutos(ev.target.value)} />
+        </Campo>
+        <Campo etiqueta="Inicio de actividades" htmlFor="arca-inicio">
+          <Input id="arca-inicio" type="date" value={inicio} onChange={(ev) => setInicio(ev.target.value)} />
         </Campo>
 
         <div className="col-span-2 grid grid-cols-2 gap-4 rounded-lg border border-linea p-4">

@@ -8,6 +8,11 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTi
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { BotonesImpresion } from '@/features/pedidos/botones-impresion';
+import { Checkbox } from '@/components/ui/checkbox';
+import { BloqueFactura } from '@/features/facturacion/bloque-factura';
+import { useEstadoFacturacion } from '@/features/facturacion/consultas';
+import { RECEPTOR_INICIAL, SelectorReceptor, validarReceptor, type BorradorReceptor } from '@/features/facturacion/selector-receptor';
+import type { DatosReceptor } from '@compartido/esquemas';
 
 const ICONOS: Record<MedioDePago, LucideIcon> = {
   efectivo: Banknote,
@@ -72,6 +77,13 @@ export function DialogoCobro({
   const [hecho, setHecho] = useState<PedidoCreado | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
+  const estadoFactura = useEstadoFacturacion();
+  const puedeFacturar = Boolean(estadoFactura.data?.activa && estadoFactura.data.lista);
+  const [facturar, setFacturar] = useState(false);
+  const [receptor, setReceptor] = useState<BorradorReceptor>(RECEPTOR_INICIAL);
+  const [errorReceptor, setErrorReceptor] = useState('');
+  /** El cliente ya validado con el que se factura al terminar el cobro. */
+  const [receptorFinal, setReceptorFinal] = useState<DatosReceptor | undefined>();
   const campoRecibido = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -80,6 +92,10 @@ export function DialogoCobro({
       setHecho(null);
       setError('');
       setGuardando(false);
+      setFacturar(false);
+      setReceptor(RECEPTOR_INICIAL);
+      setErrorReceptor('');
+      setReceptorFinal(undefined);
     }
   }, [abierto]);
 
@@ -137,6 +153,16 @@ export function DialogoCobro({
 
   function confirmar() {
     if (calculo.problema || guardando || cajaCerrada) return;
+    setReceptorFinal(undefined);
+    if (facturar && puedeFacturar) {
+      const r = validarReceptor(receptor);
+      if ('error' in r) {
+        setErrorReceptor(r.error);
+        return;
+      }
+      setErrorReceptor('');
+      setReceptorFinal(r.receptor);
+    }
     void guardar(() =>
       alCobrar(
         calculo.pagos.map((p) => ({
@@ -159,7 +185,7 @@ export function DialogoCobro({
     >
       <DialogContent className="max-w-[640px]" mostrarCerrar={!hecho}>
         {hecho ? (
-          <PedidoListo pedido={hecho} texto={textoTerminar} alTerminar={() => alTerminar(hecho)} />
+          <PedidoListo pedido={hecho} texto={textoTerminar} receptor={receptorFinal} alTerminar={() => alTerminar(hecho)} />
         ) : (
           <form
             className="flex min-h-0 flex-1 flex-col"
@@ -257,6 +283,16 @@ export function DialogoCobro({
                 </fieldset>
               ))}
 
+              {puedeFacturar && (
+                <div className="flex flex-col gap-3 rounded-xl border border-linea p-4">
+                  <label className="flex cursor-pointer items-center gap-3 text-[15px] font-semibold">
+                    <Checkbox checked={facturar} onCheckedChange={(v) => setFacturar(v === true)} aria-label="Facturar con ARCA" />
+                    Emitir factura electrónica (ARCA)
+                  </label>
+                  {facturar && <SelectorReceptor valor={receptor} alCambiar={setReceptor} error={errorReceptor} />}
+                </div>
+              )}
+
               {filas.length < 5 && (
                 <Button variant="outline" size="sm" className="self-start" onClick={dividir}>
                   <Plus /> {dividido ? 'Agregar otro pago' : 'Pagar con dos medios'}
@@ -351,7 +387,7 @@ function CampoPesos({
   );
 }
 
-function PedidoListo({ pedido, texto, alTerminar }: { pedido: PedidoCreado; texto: string; alTerminar: () => void }) {
+function PedidoListo({ pedido, texto, receptor, alTerminar }: { pedido: PedidoCreado; texto: string; receptor?: DatosReceptor; alTerminar: () => void }) {
   return (
     <div className="flex flex-col items-center gap-5 px-8 pt-10 pb-8 text-center">
       <CircleCheck className={cn('size-14', pedido.cobrado ? 'text-verde' : 'text-mostaza-fuerte')} strokeWidth={1.75} />
@@ -367,6 +403,9 @@ function PedidoListo({ pedido, texto, alTerminar }: { pedido: PedidoCreado; text
           <span className="numeros font-display text-5xl leading-none font-semibold tracking-tight">{pesos(pedido.vueltoCentavos)}</span>
         </div>
       )}
+      <div className="w-full">
+        <BloqueFactura pedidoId={pedido.id} cobrado={pedido.cobrado} comprobante={null} pendiente={null} facturarAlAbrir={receptor} />
+      </div>
       <div className="flex w-full flex-col items-center gap-2 rounded-xl border border-linea px-4 py-3">
         <BotonesImpresion pedidoId={pedido.id} tipo="comanda" />
         <BotonesImpresion pedidoId={pedido.id} tipo="ticket" />

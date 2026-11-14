@@ -70,6 +70,9 @@ export function obtenerDatosArca(db: BaseDeDatos): DatosArcaGuardados {
     cuit: valores.get('arca_cuit') ?? '',
     puntoVenta: Number.isInteger(punto) && punto > 0 ? punto : 1,
     condicionIva: valores.get('arca_condicion_iva') === 'responsable_inscripto' ? 'responsable_inscripto' : 'monotributo',
+    razonSocial: valores.get('arca_razon_social') ?? '',
+    ingresosBrutos: valores.get('arca_ingresos_brutos') ?? '',
+    inicioActividades: valores.get('arca_inicio_actividades') ?? '',
   };
 }
 
@@ -80,5 +83,8 @@ export function guardarDatosArca(db: BaseDeDatos, datos: z.output<typeof esquema
     guardar(db, 'arca_cuit', datos.cuit);
     guardar(db, 'arca_punto_venta', String(datos.puntoVenta));
     guardar(db, 'arca_condicion_iva', datos.condicionIva);
+    guardar(db, 'arca_razon_social', datos.razonSocial);
+    guardar(db, 'arca_ingresos_brutos', datos.ingresosBrutos);
+    guardar(db, 'arca_inicio_actividades', datos.inicioActividades);
   });
 }

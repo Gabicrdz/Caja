@@ -25,6 +25,7 @@ import {
   esquemaPagos,
   esquemaPedido,
   esquemaPin,
+  esquemaReceptor,
   esquemaProducto,
   esquemaRango,
   esquemaUsuario,
@@ -35,7 +36,6 @@ import { ErrorDeUsuario } from './servicios/errores';
 import * as menu from './servicios/menu';
 import { cargarMenuDeEjemplo } from './servicios/menu-ejemplo';
 import {
-  anularPedido,
   cambiarEstado,
   cobrarPedido,
   crearPedido,
@@ -43,8 +43,9 @@ import {
   obtenerPedido,
   resumenDelDia,
 } from './servicios/pedidos';
-import { guardarImpresion, guardarLocal, obtenerConfiguracion } from './servicios/configuracion';
-import { elegirArchivoArca, estadoArca, guardarArca, probarArca } from './arca/integracion';
+import { guardarImpresion, guardarLocal, obtenerConfiguracion, obtenerDatosArca } from './servicios/configuracion';
+import { autorizadorArca, elegirArchivoArca, estadoArca, estadoFacturacion, guardarArca, probarArca } from './arca/integracion';
+import { anularConNotaDeCredito, descartarPendiente, facturarPedido } from './servicios/facturacion';
 import { cargarDemo, hayPedidos } from './servicios/demo';
 import { abrirCarpetaCopias, elegirCopia, estadoCopias, exportarCopia, restaurarCopiaElegida } from './copias';
 import { darDeBajaUsuario, guardarUsuario, hayUsuarios, listarUsuarios } from './servicios/usuarios';
@@ -52,6 +53,8 @@ import { cerrarSesion, iniciarSesion, requerir, sesionActual } from './servicios
 import { abrirCaja, cajaAbierta, cerrarCaja, historialDeCajas, registrarMovimiento, resumenDeCaja } from './servicios/caja';
 import { buscarClientes, guardarCliente, listarClientes, pedidosDeCliente } from './servicios/clientes';
 import { obtenerReporte } from './servicios/reportes';
+import { libroDeVentas } from './servicios/libro-ventas';
+import { guardarLibro } from './exportar/guardar-libro';
 import { htmlCierre, htmlImpresion } from './impresion/plantillas';
 import { guardarPdf, imprimirHtml, listarImpresoras } from './impresion/imprimir';
 
@@ -116,7 +119,9 @@ function documentoDe(idDocumento: number, tipo: 'comanda' | 'ticket' | 'cierre')
     return { html: htmlCierre(resumen, local(config), config.anchoPapel), nombre: `cierre-caja-${idDocumento}`, config };
   }
   const pedido = obtenerPedido(db, idDocumento);
-  const html = htmlImpresion(tipo, pedido, local(config), config.anchoPapel);
+  const arca = obtenerDatosArca(db);
+  const emisor = { razonSocial: arca.razonSocial, cuit: arca.cuit, condicionIva: arca.condicionIva, ingresosBrutos: arca.ingresosBrutos, inicioActividades: arca.inicioActividades };
+  const html = htmlImpresion(tipo, pedido, local(config), config.anchoPapel, emisor);
   if (!html) {
     throw new ErrorDeUsuario(`El pedido #${pedido.numero} no tiene nada para la cocina (solo bebidas o productos que no se preparan).`);
   }
@@ -199,6 +204,10 @@ export function registrarCanales(info: () => { version: string; baseDeDatos: str
 
   // ── Reportes (solo el dueño: muestra cuánto vende el local) ──
   manejar(CANALES.reportesObtener, 'dueno', z.tuple([esquemaRango]), (rango) => obtenerReporte(db(), rango));
+  manejar(CANALES.libroObtener, 'dueno', z.tuple([esquemaRango]), (rango) => libroDeVentas(db(), rango, obtenerDatosArca(db()).ambiente));
+  manejar(CANALES.libroExportar, 'dueno', z.tuple([esquemaRango]), async (rango) => ({
+    ruta: await guardarLibro(libroDeVentas(db(), rango, obtenerDatosArca(db()).ambiente)),
+  }));
 
   manejar(CANALES.pedidoResumenHoy, 'sesion', nada, () => resumenDelDia(db()));
   manejar(CANALES.pedidoListar, 'sesion', z.tuple([esquemaFecha]), (fecha) => listarPedidos(db(), { fecha }));
@@ -206,10 +215,10 @@ export function registrarCanales(info: () => { version: string; baseDeDatos: str
     cambiarEstado(db(), pedidoId, estado);
     return null;
   });
-  manejar(CANALES.pedidoAnular, 'dueno', z.tuple([id, esquemaMotivo]), (pedidoId, motivo, yo) => {
-    anularPedido(db(), pedidoId, motivo, yo.id);
-    return null;
-  });
+  // Si el pedido tenía factura, se emite la nota de crédito en ARCA antes de anularlo.
+  manejar(CANALES.pedidoAnular, 'dueno', z.tuple([id, esquemaMotivo]), (pedidoId, motivo, yo) =>
+    anularConNotaDeCredito(db(), autorizadorArca(db()), pedidoId, motivo, yo.id),
+  );
   manejar(CANALES.pedidoCobrar, 'sesion', z.tuple([id, esquemaPagos]), (pedidoId, pagos, yo) => cobrarPedido(db(), pedidoId, pagos, yo.id));
 
   // ── Caja ──
@@ -252,6 +261,16 @@ export function registrarCanales(info: () => { version: string; baseDeDatos: str
   });
   manejar(CANALES.arcaElegirArchivo, 'dueno', z.tuple([esquemaArchivoArca, ambienteArca]), (archivo, ambiente) => elegirArchivoArca(archivo, ambiente));
   manejar(CANALES.arcaProbar, 'dueno', nada, () => probarArca(db()));
+
+  // ── Facturar con ARCA (el cajero también: es parte de cobrar) ──
+  manejar(CANALES.facturacionEstado, 'sesion', nada, () => estadoFacturacion(db()));
+  manejar(CANALES.facturacionFacturar, 'sesion', z.tuple([id, esquemaReceptor.nullable()]), (pedidoId, receptor, usuario) =>
+    facturarPedido(db(), autorizadorArca(db()), pedidoId, receptor, usuario.id),
+  );
+  manejar(CANALES.facturacionDescartar, 'sesion', z.tuple([id]), (pedidoId) => {
+    descartarPendiente(db(), pedidoId);
+    return null;
+  });
 
   // ── Copias de seguridad y demo (solo el dueño) ──
   manejar(CANALES.copiasEstado, 'dueno', nada, () => estadoCopias());

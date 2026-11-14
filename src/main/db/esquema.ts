@@ -205,3 +205,37 @@ export const clientes = sqliteTable('clientes', {
   creadoEn: text('creado_en').notNull().default(ahora),
   actualizadoEn: text('actualizado_en').notNull().default(ahora),
 });
+
+export const comprobantes = sqliteTable('comprobantes', {
+  id: integer('id').primaryKey(),
+  pedidoId: integer('pedido_id')
+    .notNull()
+    .references(() => pedidos.id),
+  tipo: integer('tipo').notNull(),
+  puntoVenta: integer('punto_venta').notNull(),
+  numero: integer('numero').notNull(),
+  fecha: text('fecha').notNull(),
+  totalCentavos: integer('total_centavos').notNull(),
+  docTipo: integer('doc_tipo').notNull(),
+  docNro: text('doc_nro').notNull().default('0'),
+  condicionIvaReceptor: integer('condicion_iva_receptor').notNull(),
+  cae: text('cae').notNull(),
+  vencimientoCae: text('vencimiento_cae').notNull(),
+  ambiente: text('ambiente', { enum: ['homologacion', 'produccion'] }).notNull(),
+  cuitEmisor: text('cuit_emisor').notNull(),
+  asociadoId: integer('asociado_id'),
+  usuarioId: integer('usuario_id').references(() => usuarios.id),
+  creadoEn: text('creado_en').notNull().default(ahora),
+});
+
+export const facturasPendientes = sqliteTable('facturas_pendientes', {
+  pedidoId: integer('pedido_id')
+    .primaryKey()
+    .references(() => pedidos.id),
+  docTipo: integer('doc_tipo').notNull(),
+  docNro: text('doc_nro').notNull().default('0'),
+  condicionIvaReceptor: integer('condicion_iva_receptor').notNull(),
+  ultimoError: text('ultimo_error').notNull().default(''),
+  intentos: integer('intentos').notNull().default(1),
+  actualizadoEn: text('actualizado_en').notNull().default(ahora),
+});

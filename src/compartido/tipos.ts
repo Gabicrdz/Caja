@@ -109,6 +109,29 @@ export interface PagoDetalle {
 }
 
 /** Un pedido completo, con sus renglones y pagos (para la pantalla Pedidos y la impresión). */
+/** La factura que ARCA autorizó para un pedido (lo que se muestra y se imprime). */
+export interface ComprobanteResumen {
+  id: number;
+  tipo: number;
+  /** "Factura C", "Factura B"… */
+  nombre: string;
+  puntoVenta: number;
+  numero: number;
+  /** "0001-00000008" */
+  numeroCompleto: string;
+  fecha: string;
+  totalCentavos: number;
+  cae: string;
+  vencimientoCae: string;
+  docTipo: number;
+  docNro: string;
+  /** Condición del cliente frente al IVA (1 RI, 4 exento, 5 consumidor final, 6 monotributo). */
+  condicionIvaReceptor: number;
+  ambiente: AmbienteArca;
+  /** CUIT de quien emitió (va en el QR). */
+  cuitEmisor: string;
+}
+
 export interface PedidoDetalle {
   id: number;
   numero: number;
@@ -128,6 +151,12 @@ export interface PedidoDetalle {
   motivoAnulacion: string;
   items: ItemDetalle[];
   pagos: PagoDetalle[];
+  /** Factura autorizada por ARCA, si tiene. */
+  comprobante: ComprobanteResumen | null;
+  /** La nota de crédito que anuló la factura, si la hubo. */
+  notaDeCredito: ComprobanteResumen | null;
+  /** Si se quiso facturar y ARCA no pudo: el motivo (queda para reintentar). */
+  facturaPendiente: string | null;
 }
 
 export type TipoImpresion = 'comanda' | 'ticket' | 'cierre';
@@ -236,11 +265,28 @@ export interface EstadoArca {
   cuit: string;
   puntoVenta: number;
   condicionIva: CondicionIvaEmisor;
+  /** Datos que se imprimen en la factura (pueden estar vacíos). */
+  razonSocial: string;
+  ingresosBrutos: string;
+  /** AAAA-MM-DD o ''. */
+  inicioActividades: string;
   /** Hay un certificado (.crt) cargado para este ambiente. */
   tieneCertificado: boolean;
   tieneClave: boolean;
   /** Cuándo vence el certificado cargado (AAAA-MM-DD), o null. */
   vencimientoCertificado: string | null;
+}
+
+/** Lo que necesita la pantalla de cobro para decidir si ofrece "Facturar". */
+export interface EstadoFacturacion {
+  /** Está encendida en Ajustes. */
+  activa: boolean;
+  /** Y además tiene CUIT, certificado y clave: se puede facturar ya. */
+  lista: boolean;
+  ambiente: AmbienteArca;
+  condicionIva: CondicionIvaEmisor;
+  /** Pedidos cobrados que quedaron sin facturar por un error de ARCA. */
+  pendientes: number;
 }
 
 export interface PasoPruebaArca {
@@ -336,3 +382,39 @@ export interface Reporte {
 }
 
 export type Respuesta<T> = { ok: true; datos: T } | { ok: false; error: string };
+
+// ───────── Libro de ventas (para el contador) ─────────
+
+export interface FilaLibro {
+  fecha: string;
+  /** "Factura C", "Nota de Crédito C"… */
+  comprobante: string;
+  esNota: boolean;
+  puntoVenta: number;
+  numero: number;
+  numeroCompleto: string;
+  /** "Consumidor Final", "DNI 30123456", "CUIT 20-…". */
+  cliente: string;
+  condicionIva: string;
+  /** Importes con signo: las notas de crédito restan. */
+  netoCentavos: number;
+  ivaCentavos: number;
+  totalCentavos: number;
+  cae: string;
+  vencimientoCae: string;
+  /** Pedido del que salió (número del día y fecha). */
+  pedidoNumero: number;
+  pedidoFecha: string;
+}
+
+export interface LibroDeVentas {
+  desde: string;
+  hasta: string;
+  ambiente: AmbienteArca;
+  filas: FilaLibro[];
+  facturas: number;
+  notas: number;
+  netoCentavos: number;
+  ivaCentavos: number;
+  totalCentavos: number;
+}

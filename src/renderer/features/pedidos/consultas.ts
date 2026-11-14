@@ -44,9 +44,9 @@ export function useAnular() {
   const refrescar = useRefrescar();
   return useMutation({
     mutationFn: ({ id, motivo }: { id: number; motivo: string }) => desenvolver(caja().pedidos.anular(id, motivo)),
-    onSuccess: async () => {
+    onSuccess: async (nota) => {
       await refrescar();
-      toast.success('Pedido anulado');
+      toast.success('Pedido anulado', nota ? { description: `${nota.nombre} ${nota.numeroCompleto} emitida en ARCA` } : undefined);
     },
   });
 }

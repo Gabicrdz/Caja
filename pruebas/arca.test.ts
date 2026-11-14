@@ -444,9 +444,9 @@ describe('Archivos de ARCA y datos guardados', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'arca-db-'));
     const db = abrirBaseDeDatos(path.join(dir, 'x.db'));
     try {
-      expect(obtenerDatosArca(db)).toEqual({ activa: false, ambiente: 'homologacion', cuit: '', puntoVenta: 1, condicionIva: 'monotributo' });
-      guardarDatosArca(db, { activa: true, ambiente: 'produccion', cuit: '20446474937', puntoVenta: 4, condicionIva: 'responsable_inscripto' });
-      expect(obtenerDatosArca(db)).toEqual({ activa: true, ambiente: 'produccion', cuit: '20446474937', puntoVenta: 4, condicionIva: 'responsable_inscripto' });
+      expect(obtenerDatosArca(db)).toEqual({ activa: false, ambiente: 'homologacion', cuit: '', puntoVenta: 1, condicionIva: 'monotributo', razonSocial: '', ingresosBrutos: '', inicioActividades: '' });
+      guardarDatosArca(db, { activa: true, ambiente: 'produccion', cuit: '20446474937', puntoVenta: 4, condicionIva: 'responsable_inscripto', razonSocial: 'Cardozo Sergio', ingresosBrutos: 'Exento', inicioActividades: '2024-03-01' });
+      expect(obtenerDatosArca(db)).toEqual({ activa: true, ambiente: 'produccion', cuit: '20446474937', puntoVenta: 4, condicionIva: 'responsable_inscripto', razonSocial: 'Cardozo Sergio', ingresosBrutos: 'Exento', inicioActividades: '2024-03-01' });
     } finally {
       cerrarBaseDeDatos();
     }

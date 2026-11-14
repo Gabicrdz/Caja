@@ -11,6 +11,7 @@ import { BotonesImpresion } from './botones-impresion';
 import { useAnular, useCambiarEstado } from './consultas';
 import { destinoDe, siguientePaso } from './tarjeta-pedido';
 import { useUsuario } from '@/features/sesion/consultas';
+import { BloqueFactura } from '@/features/facturacion/bloque-factura';
 
 const ANTERIOR: Partial<Record<EstadoPedido, 'pendiente' | 'en_preparacion' | 'listo'>> = {
   en_preparacion: 'pendiente',
@@ -142,6 +143,16 @@ export function DialogoDetalle({
             )}
           </dl>
 
+          <BloqueFactura
+            key={p.id}
+            pedidoId={p.id}
+            cobrado={p.cobrado}
+            anulado={p.estado === 'anulado'}
+            comprobante={p.comprobante}
+            notaDeCredito={p.notaDeCredito}
+            pendiente={p.facturaPendiente}
+          />
+
           {anulando && (
             <div className="flex flex-col gap-2 rounded-xl border border-rojo/40 bg-rojo-suave/50 p-4">
               <label htmlFor="motivo" className="text-sm font-semibold">¿Por qué se anula?</label>
@@ -162,11 +173,12 @@ export function DialogoDetalle({
               <p className="text-[13px] text-tinta-suave">
                 El pedido no se borra: queda anulado con este motivo y deja de sumar en las ventas del día.
                 {p.cobrado && ' Si ya se cobró, acordate de devolver la plata.'}
+                {p.comprobante && ` Como tiene la ${p.comprobante.nombre} ${p.comprobante.numeroCompleto}, se emite una nota de crédito en ARCA (por el mismo importe) y recién ahí se anula.`}
               </p>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => setAnulando(false)}>Cancelar</Button>
                 <Button variant="destructive" size="sm" disabled={anular.isPending} onClick={() => void confirmarAnulacion()}>
-                  Anular pedido
+                  {anular.isPending ? (p.comprobante ? 'Emitiendo nota de crédito…' : 'Anulando…') : p.comprobante ? 'Emitir nota de crédito y anular' : 'Anular pedido'}
                 </Button>
               </div>
             </div>

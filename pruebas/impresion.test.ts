@@ -32,6 +32,9 @@ const pedido: PedidoDetalle = {
     { id: 3, nombre: 'Flan casero', varianteNombre: '', cantidad: 1, unitarioCentavos: $(2700), agregadosCentavos: 0, totalCentavos: $(2700), nota: '', vaACocina: true, agregados: [] },
   ],
   pagos: [{ medio: 'efectivo', montoCentavos: $(26800), recibidoCentavos: $(30000), vueltoCentavos: $(3200) }],
+  comprobante: null,
+  notaDeCredito: null,
+  facturaPendiente: null,
 };
 
 const texto = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');

@@ -5,10 +5,11 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { z } from 'zod';
 import type { esquemaArca } from '@compartido/esquemas';
-import type { AmbienteArca, EstadoArca, PasoPruebaArca } from '@compartido/tipos';
+import type { AmbienteArca, EstadoArca, EstadoFacturacion, PasoPruebaArca } from '@compartido/tipos';
 import type { BaseDeDatos } from '../db/conexion';
 import { guardarDatosArca, obtenerDatosArca } from '../servicios/configuracion';
 import { ErrorDeUsuario } from '../servicios/errores';
+import { contarPendientes, type Autorizador } from '../servicios/facturacion';
 import { ErrorDeArchivo, existeArchivo, guardarTicket, importarArchivo, leerTicket, rutaDe, vencimientoDelCertificado, type ArchivoArca } from './almacen';
 import { ServicioArca } from './servicio';
 import type { ConfigArca } from './tipos';
@@ -75,4 +76,22 @@ export function crearServicioArca(db: BaseDeDatos): ServicioArca {
 
 export function probarArca(db: BaseDeDatos): Promise<PasoPruebaArca[]> {
   return crearServicioArca(db).probar();
+}
+
+export function estadoFacturacion(db: BaseDeDatos): EstadoFacturacion {
+  const e = estadoArca(db);
+  return {
+    activa: e.activa,
+    lista: e.activa && !!e.cuit && e.tieneCertificado && e.tieneClave,
+    ambiente: e.ambiente,
+    condicionIva: e.condicionIva,
+    pendientes: contarPendientes(db),
+  };
+}
+
+/** Lo que usa facturarPedido para hablar con ARCA con la configuración guardada. */
+export function autorizadorArca(db: BaseDeDatos): Autorizador {
+  const { activa, ambiente, cuit, puntoVenta, condicionIva } = obtenerDatosArca(db);
+  const servicio = crearServicioArca(db);
+  return { config: { activa, ambiente, cuit, puntoVenta, condicionIva }, autorizar: (datos) => servicio.autorizar(datos) };
 }

@@ -8,6 +8,7 @@ import type {
   DatosRango,
   DatosGrupo,
   DatosArca,
+  DatosReceptor,
   DatosImpresion,
   DatosLocal,
   DatosMovimiento,
@@ -21,7 +22,9 @@ import type {
   Cliente,
   Configuracion,
   CopiaElegida,
+  ComprobanteResumen,
   EstadoArca,
+  EstadoFacturacion,
   EstadoCopias,
   EstadoPedido,
   Impresora,
@@ -31,6 +34,7 @@ import type {
   PedidoCreado,
   PedidoDetalle,
   PedidoDeCliente,
+  LibroDeVentas,
   Reporte,
   Respuesta,
   ResumenCaja,
@@ -89,7 +93,8 @@ export interface ApiCaja {
     /** fecha 'AAAA-MM-DD'. */
     listar(fecha: string): Promise<Respuesta<PedidoDetalle[]>>;
     cambiarEstado(id: number, estado: Exclude<EstadoPedido, 'anulado'>): Promise<Respuesta<null>>;
-    anular(id: number, motivo: string): Promise<Respuesta<null>>;
+    /** Devuelve la nota de crédito si el pedido tenía factura. */
+    anular(id: number, motivo: string): Promise<Respuesta<ComprobanteResumen | null>>;
     cobrar(id: number, pagos: DatosPagos): Promise<Respuesta<PedidoCreado>>;
   };
   clientes: {
@@ -102,6 +107,12 @@ export interface ApiCaja {
   reportes: {
     /** Solo el dueño. Fechas 'AAAA-MM-DD', las dos incluidas. */
     obtener(rango: DatosRango): Promise<Respuesta<Reporte>>;
+  };
+  libro: {
+    /** Solo el dueño: facturas y notas de crédito del período (del ambiente en uso). */
+    obtener(rango: DatosRango): Promise<Respuesta<LibroDeVentas>>;
+    /** Guarda el Excel en Documentos\Caja\Libro de ventas y lo abre. */
+    exportar(rango: DatosRango): Promise<Respuesta<{ ruta: string }>>;
   };
   impresion: {
     /** id = pedido (comanda, ticket) o caja (cierre). impreso = false si se canceló el diálogo. */
@@ -124,6 +135,14 @@ export interface ApiCaja {
     elegirArchivo(archivo: 'certificado' | 'clave', ambiente: 'homologacion' | 'produccion'): Promise<Respuesta<boolean>>;
     /** Recorre la conexión paso a paso y dice dónde falla. */
     probar(): Promise<Respuesta<PasoPruebaArca[]>>;
+  };
+  /** Facturar pedidos cobrados con ARCA (dueño y cajero). */
+  facturacion: {
+    estado(): Promise<Respuesta<EstadoFacturacion>>;
+    /** receptor null = el del intento anterior, o consumidor final. */
+    facturar(pedidoId: number, receptor: DatosReceptor | null): Promise<Respuesta<ComprobanteResumen>>;
+    /** "No quiero facturar este pedido": saca el aviso de pendiente. */
+    descartarPendiente(pedidoId: number): Promise<Respuesta<null>>;
   };
   /** Copias de seguridad (solo el dueño). */
   copias: {
@@ -185,6 +204,8 @@ export const CANALES = {
   clientesGuardar: 'clientes:guardar',
   clientesPedidos: 'clientes:pedidos',
   reportesObtener: 'reportes:obtener',
+  libroObtener: 'libro:obtener',
+  libroExportar: 'libro:exportar',
   impresionImprimir: 'impresion:imprimir',
   impresionPdf: 'impresion:pdf',
   impresionImpresoras: 'impresion:impresoras',
@@ -202,5 +223,8 @@ export const CANALES = {
   arcaGuardar: 'arca:guardar',
   arcaElegirArchivo: 'arca:elegir-archivo',
   arcaProbar: 'arca:probar',
+  facturacionEstado: 'facturacion:estado',
+  facturacionFacturar: 'facturacion:facturar',
+  facturacionDescartar: 'facturacion:descartar',
   sistemaInfo: 'sistema:info',
 } as const;

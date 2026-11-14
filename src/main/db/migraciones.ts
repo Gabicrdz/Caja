@@ -262,4 +262,44 @@ export const MIGRACIONES: Migracion[] = [
         ('pie_ticket', '¡Gracias por tu compra!');
     `,
   },
+  {
+    nombre: 'Facturación electrónica con ARCA: comprobantes y facturas pendientes',
+    sql: /* sql */ `
+      -- Cada factura (o nota de crédito) que ARCA autorizó. NUNCA se borra ni se edita:
+      -- es un documento fiscal. Para corregir una factura se emite una nota de crédito.
+      CREATE TABLE comprobantes (
+        id                       INTEGER PRIMARY KEY,
+        pedido_id                INTEGER NOT NULL REFERENCES pedidos (id),
+        tipo                     INTEGER NOT NULL,          -- 1 A, 6 B, 11 C; 3, 8, 13 = notas de crédito
+        punto_venta              INTEGER NOT NULL,
+        numero                   INTEGER NOT NULL,
+        fecha                    TEXT    NOT NULL,          -- AAAA-MM-DD, la que se mandó a ARCA
+        total_centavos           INTEGER NOT NULL CHECK (total_centavos > 0),
+        doc_tipo                 INTEGER NOT NULL,          -- 99 consumidor final, 96 DNI, 80 CUIT
+        doc_nro                  TEXT    NOT NULL DEFAULT '0',
+        condicion_iva_receptor   INTEGER NOT NULL,
+        cae                      TEXT    NOT NULL,
+        vencimiento_cae          TEXT    NOT NULL,          -- AAAA-MM-DD
+        ambiente                 TEXT    NOT NULL CHECK (ambiente IN ('homologacion', 'produccion')),
+        cuit_emisor              TEXT    NOT NULL,
+        asociado_id              INTEGER REFERENCES comprobantes (id),  -- la factura que anula una nota de crédito
+        usuario_id               INTEGER REFERENCES usuarios (id),
+        creado_en                TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+        UNIQUE (cuit_emisor, ambiente, tipo, punto_venta, numero)
+      );
+      CREATE INDEX comprobantes_por_pedido ON comprobantes (pedido_id);
+
+      -- Pedidos cobrados a los que se quiso facturar pero ARCA no respondió o rechazó.
+      -- Quedan acá con el motivo para reintentar (el pedido igual se cobró).
+      CREATE TABLE facturas_pendientes (
+        pedido_id                INTEGER PRIMARY KEY REFERENCES pedidos (id),
+        doc_tipo                 INTEGER NOT NULL,
+        doc_nro                  TEXT    NOT NULL DEFAULT '0',
+        condicion_iva_receptor   INTEGER NOT NULL,
+        ultimo_error             TEXT    NOT NULL DEFAULT '',
+        intentos                 INTEGER NOT NULL DEFAULT 1,
+        actualizado_en           TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+      );
+    `,
+  },
 ];

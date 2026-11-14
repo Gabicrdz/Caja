@@ -2,14 +2,18 @@
 // Son funciones puras: reciben el pedido y devuelven texto. Así se pueden
 // probar sin impresora y sin abrir Electron.
 import { pesos } from '@compartido/dinero';
+import { cuitConGuiones } from '@compartido/cuit';
+import { qrComoSvg } from '@compartido/qr';
 import {
   MEDIOS_DE_PAGO,
   NOMBRE_MEDIO,
   NOMBRE_MOVIMIENTO,
   NOMBRE_TIPO,
+  type ComprobanteResumen,
   type PedidoDetalle,
   type ResumenCaja,
 } from '@compartido/tipos';
+import { urlQr } from '../arca/qr';
 
 /** Todo texto que escribió una persona pasa por acá antes de ir al HTML. */
 export function escapar(texto: string): string {
@@ -103,8 +107,117 @@ function encabezado(local: Local): string {
     ${l.telefono ? `<div class="centro chico">Tel. ${escapar(l.telefono)}</div>` : ''}`;
 }
 
-/** Ticket para el cliente: con precios, pagos y vuelto. No es factura. */
-export function htmlTicket(p: PedidoDetalle, local: Local, anchoMm: 58 | 80): string {
+/** Quién factura: va impreso en la factura (los datos salen de Ajustes → ARCA). */
+export interface DatosEmisor {
+  razonSocial: string;
+  cuit: string;
+  condicionIva: 'monotributo' | 'responsable_inscripto';
+  ingresosBrutos: string;
+  /** AAAA-MM-DD o ''. */
+  inicioActividades: string;
+}
+
+const NOMBRE_CONDICION_IVA: Record<number, string> = {
+  1: 'IVA Responsable Inscripto',
+  4: 'IVA Sujeto Exento',
+  5: 'Consumidor Final',
+  6: 'Responsable Monotributo',
+};
+
+/**
+ * Factura o nota de crédito para imprimir: datos del emisor, tipo y número, cliente,
+ * detalle, CAE y el QR que lleva a la página de ARCA. En homologación se marca como
+ * "sin validez fiscal" para que nadie la entregue por error.
+ */
+function cuerpoFiscal(p: PedidoDetalle, c: ComprobanteResumen, local: Local, emisor: DatosEmisor | undefined, asociada: ComprobanteResumen | null): string {
+  const l = comoLocal(local);
+  const letra = c.nombre.slice(-1);
+  const esNota = asociada !== null;
+  const cliente =
+    c.docTipo === 80
+      ? `CUIT ${cuitConGuiones(c.docNro)} · ${NOMBRE_CONDICION_IVA[c.condicionIvaReceptor] ?? ''}`
+      : c.docTipo === 96
+        ? `DNI ${escapar(c.docNro)} · Consumidor Final`
+        : 'Consumidor Final';
+  const qr = qrComoSvg(
+    urlQr({
+      comprobante: { resultado: 'A', tipo: c.tipo, puntoVenta: c.puntoVenta, numero: c.numero, cae: c.cae, vencimientoCae: c.vencimientoCae, observaciones: [] },
+      fecha: c.fecha,
+      cuitEmisor: c.cuitEmisor,
+      totalCentavos: c.totalCentavos,
+      docTipo: c.docTipo,
+      docNro: c.docNro,
+    }),
+    32,
+  );
+  // Factura A: se discrimina el IVA. Factura B: "IVA contenido". Factura C (monotributo): no lleva IVA.
+  const iva = c.totalCentavos - Math.round((c.totalCentavos * 100) / 121);
+  const neto = c.totalCentavos - iva;
+  const ivaTexto =
+    letra === 'A'
+      ? `<div class="fila"><span>Importe neto gravado</span><span>${pesos(neto)}</span></div><div class="fila"><span>IVA 21 %</span><span>${pesos(iva)}</span></div>`
+      : letra === 'B'
+        ? `<div class="fila chico"><span>IVA contenido (21 %)</span><span>${pesos(iva)}</span></div>`
+        : '';
+  const vuelto = p.pagos.reduce((s, x) => s + x.vueltoCentavos, 0);
+  const condicionEmisor = emisor ? NOMBRE_CONDICION_IVA[emisor.condicionIva === 'monotributo' ? 6 : 1] : '';
+  return `
+    <div class="centro grande">${escapar(emisor?.razonSocial || l.nombre)}</div>
+    ${emisor?.razonSocial && emisor.razonSocial !== l.nombre ? `<div class="centro chico">${escapar(l.nombre)}</div>` : ''}
+    ${l.direccion ? `<div class="centro chico">${escapar(l.direccion)}</div>` : ''}
+    <div class="centro chico">CUIT ${cuitConGuiones(c.cuitEmisor)}${condicionEmisor ? ` · ${condicionEmisor}` : ''}</div>
+    ${emisor?.ingresosBrutos ? `<div class="centro chico">Ingresos Brutos: ${escapar(emisor.ingresosBrutos)}</div>` : ''}
+    ${emisor?.inicioActividades ? `<div class="centro chico">Inicio de actividades: ${fechaCorta(emisor.inicioActividades)}</div>` : ''}
+    <div class="linea"></div>
+    <div class="caja centro">
+      <div class="enorme">${letra}</div>
+      <div class="negrita">${esNota ? 'NOTA DE CRÉDITO' : 'FACTURA'} · Cód. ${String(c.tipo).padStart(3, '0')}</div>
+    </div>
+    <div class="fila negrita"><span>Nº ${c.numeroCompleto}</span><span>${fechaCorta(c.fecha)}</span></div>
+    ${asociada ? `<div class="chico">Anula la ${asociada.nombre} Nº ${asociada.numeroCompleto}</div>` : ''}
+    <div class="linea"></div>
+    <div class="chico">Cliente: ${cliente}</div>
+    <div class="chico">Pedido #${p.numero} · ${destino(p)}</div>
+    <div class="linea"></div>
+    ${p.items
+      .map(
+        (i) => `
+      <div class="item">
+        <div class="fila"><span>${i.cantidad} × ${escapar(i.nombre)}${i.varianteNombre ? ` ${escapar(i.varianteNombre)}` : ''}</span><span>${pesos(i.totalCentavos)}</span></div>
+        ${i.agregados.map((a) => `<div class="sub chico">+ ${escapar(a.nombre)}</div>`).join('')}
+      </div>`,
+      )
+      .join('')}
+    ${p.envioCentavos > 0 ? `<div class="fila"><span>Envío</span><span>${pesos(p.envioCentavos)}</span></div>` : ''}
+    <div class="linea"></div>
+    ${ivaTexto}
+    <div class="fila grande"><span>TOTAL</span><span>${pesos(c.totalCentavos)}</span></div>
+    ${
+      esNota
+        ? ''
+        : p.pagos
+            .map((x) => `<div class="fila"><span>${NOMBRE_MEDIO[x.medio]}${x.vueltoCentavos ? ` (pagó ${pesos(x.recibidoCentavos)})` : ''}</span><span>${pesos(x.montoCentavos)}</span></div>`)
+            .join('') + (vuelto ? `<div class="fila negrita"><span>Vuelto</span><span>${pesos(vuelto)}</span></div>` : '')
+    }
+    <div class="linea"></div>
+    <div class="fila chico"><span>CAE Nº</span><span>${escapar(c.cae)}</span></div>
+    <div class="fila chico"><span>Vto. CAE</span><span>${fechaCorta(c.vencimientoCae)}</span></div>
+    <div class="centro" style="margin-top:2mm">${qr}</div>
+    <div class="centro chico">Comprobante autorizado por ARCA</div>
+    ${c.ambiente === 'homologacion' ? '<div class="caja centro negrita" style="margin-top:2mm">COMPROBANTE DE PRUEBA<br>SIN VALIDEZ FISCAL</div>' : ''}
+    ${l.pie ? `<div class="centro negrita" style="margin-top:2mm">${escapar(l.pie)}</div>` : ''}
+  `;
+}
+
+/** Ticket para el cliente. Si el pedido está facturado, sale la factura (o su nota de crédito). */
+export function htmlTicket(p: PedidoDetalle, local: Local, anchoMm: 58 | 80, emisor?: DatosEmisor): string {
+  if (p.comprobante) {
+    const cuerpo = p.notaDeCredito
+      ? cuerpoFiscal(p, p.notaDeCredito, local, emisor, p.comprobante)
+      : cuerpoFiscal(p, p.comprobante, local, emisor, null);
+    const titulo = p.notaDeCredito ? p.notaDeCredito : p.comprobante;
+    return documento(`${titulo.nombre} ${titulo.numeroCompleto}`, cuerpo, anchoMm);
+  }
   const vuelto = p.pagos.reduce((s, x) => s + x.vueltoCentavos, 0);
   const pie = comoLocal(local).pie;
   const cuerpo = `
@@ -148,8 +261,8 @@ export function htmlTicket(p: PedidoDetalle, local: Local, anchoMm: 58 | 80): st
   return documento(`Ticket #${p.numero}`, cuerpo, anchoMm);
 }
 
-export function htmlImpresion(tipo: 'comanda' | 'ticket', p: PedidoDetalle, local: Local, anchoMm: 58 | 80): string | null {
-  return tipo === 'comanda' ? htmlComanda(p, anchoMm) : htmlTicket(p, local, anchoMm);
+export function htmlImpresion(tipo: 'comanda' | 'ticket', p: PedidoDetalle, local: Local, anchoMm: 58 | 80, emisor?: DatosEmisor): string | null {
+  return tipo === 'comanda' ? htmlComanda(p, anchoMm) : htmlTicket(p, local, anchoMm, emisor);
 }
 
 function fechaHora(momento: string): string {

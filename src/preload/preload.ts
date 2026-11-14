@@ -63,6 +63,10 @@ const api: ApiCaja = {
   reportes: {
     obtener: (rango) => pedir(CANALES.reportesObtener, rango),
   },
+  libro: {
+    obtener: (rango) => pedir(CANALES.libroObtener, rango),
+    exportar: (rango) => pedir(CANALES.libroExportar, rango),
+  },
   impresion: {
     imprimir: (id, tipo) => pedir(CANALES.impresionImprimir, id, tipo),
     pdf: (id, tipo) => pedir(CANALES.impresionPdf, id, tipo),
@@ -78,6 +82,11 @@ const api: ApiCaja = {
     guardar: (datos) => pedir(CANALES.arcaGuardar, datos),
     elegirArchivo: (archivo, ambiente) => pedir(CANALES.arcaElegirArchivo, archivo, ambiente),
     probar: () => pedir(CANALES.arcaProbar),
+  },
+  facturacion: {
+    estado: () => pedir(CANALES.facturacionEstado),
+    facturar: (pedidoId, receptor) => pedir(CANALES.facturacionFacturar, pedidoId, receptor),
+    descartarPendiente: (pedidoId) => pedir(CANALES.facturacionDescartar, pedidoId),
   },
   copias: {
     estado: () => pedir(CANALES.copiasEstado),

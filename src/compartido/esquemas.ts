@@ -297,6 +297,43 @@ export const esquemaArca = z.object({
     .refine((c) => c === '' || cuitValido(c), 'El CUIT no es válido. Revisá que esté bien escrito.'),
   puntoVenta: z.number().int('El punto de venta es un número entero.').min(1, 'El punto de venta va de 1 a 99999.').max(99999, 'El punto de venta va de 1 a 99999.'),
   condicionIva: z.enum(['monotributo', 'responsable_inscripto']),
+  /** Los tres siguientes van impresos en la factura. */
+  razonSocial: z.string().trim().max(80, 'La razón social es demasiado larga.').default(''),
+  ingresosBrutos: z.string().trim().max(30, 'Ingresos Brutos: escribí el número o "Exento".').default(''),
+  inicioActividades: z
+    .string()
+    .trim()
+    .refine((f) => f === '' || /^\d{4}-\d{2}-\d{2}$/.test(f), 'La fecha de inicio de actividades no es válida.')
+    .default(''),
 });
 export type DatosArca = z.input<typeof esquemaArca>;
+/** A quién se le factura: consumidor final (sin datos), con DNI o con CUIT. */
+export const esquemaReceptor = z
+  .object({
+    tipo: z.enum(['consumidor_final', 'dni', 'cuit']),
+    numero: z.string().transform(soloNumeros).default(''),
+    /** Solo para CUIT: 1 responsable inscripto, 4 exento, 6 monotributo. */
+    condicionIva: z.number().int().optional(),
+  })
+  .transform((r, ctx) => {
+    if (r.tipo === 'consumidor_final') return { docTipo: 99, docNro: '0', condicionIva: 5 };
+    if (r.tipo === 'dni') {
+      if (!/^\d{7,8}$/.test(r.numero)) {
+        ctx.addIssue({ code: 'custom', message: 'El DNI tiene 7 u 8 números.' });
+        return z.NEVER;
+      }
+      return { docTipo: 96, docNro: r.numero, condicionIva: 5 };
+    }
+    if (!cuitValido(r.numero)) {
+      ctx.addIssue({ code: 'custom', message: 'El CUIT del cliente no es válido. Revisá que esté bien escrito.' });
+      return z.NEVER;
+    }
+    const condicion = r.condicionIva ?? 5;
+    if (![1, 4, 5, 6].includes(condicion)) {
+      ctx.addIssue({ code: 'custom', message: 'Elegí la condición del cliente frente al IVA.' });
+      return z.NEVER;
+    }
+    return { docTipo: 80, docNro: r.numero, condicionIva: condicion };
+  });
+export type DatosReceptor = z.input<typeof esquemaReceptor>;
 export const esquemaArchivoArca = z.enum(['certificado', 'clave']);

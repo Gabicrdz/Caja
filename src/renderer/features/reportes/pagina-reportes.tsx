@@ -10,8 +10,9 @@ import { GraficoColumnas, type Columna } from '@/components/graficos/columnas';
 import { BarrasHorizontales, porcentaje } from '@/components/graficos/barras';
 import { TarjetaGrafico } from '@/components/graficos/tarjeta-grafico';
 import { cn } from '@/lib/utils';
-import { useReporte } from './consultas';
+import { useExportarLibro, useLibroDeVentas, useReporte } from './consultas';
 import { PERIODOS, columnasDeVentas, rangoDe, tablaDeVentas, textoAnterior, textoPedidos, textoRango, type Periodo, type Rango } from './rangos';
+import { TablaLibro } from './tabla-libro';
 import { TablaProductos } from './tabla-productos';
 
 export function PaginaReportes() {
@@ -19,6 +20,8 @@ export function PaginaReportes() {
   const [rango, setRango] = useState<Rango>(() => rangoDe('7dias'));
   const [pestana, setPestana] = useState('resumen');
   const reporte = useReporte(rango);
+  const libro = useLibroDeVentas(rango);
+  const exportar = useExportarLibro();
   const r = reporte.data;
 
   return (
@@ -52,6 +55,7 @@ export function PaginaReportes() {
           <TabsList>
             <TabsTrigger value="resumen">Resumen</TabsTrigger>
             <TabsTrigger value="productos">Productos</TabsTrigger>
+            <TabsTrigger value="libro">Libro de ventas</TabsTrigger>
           </TabsList>
           <TabsContent value="resumen" className="flex flex-col gap-5">
             <Datos r={r} />
@@ -63,6 +67,10 @@ export function PaginaReportes() {
           </TabsContent>
           <TabsContent value="productos">
             <TablaProductos productos={r.productos} />
+          </TabsContent>
+          <TabsContent value="libro">
+            {libro.isError && <p role="alert" className="font-semibold text-rojo">{libro.error.message}</p>}
+            {libro.data && <TablaLibro libro={libro.data} exportando={exportar.isPending} alExportar={() => exportar.mutate(rango)} />}
           </TabsContent>
         </Tabs>
       )}
