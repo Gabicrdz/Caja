@@ -16,6 +16,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Marca } from './marca';
 import { useBloquear, useUsuario } from '@/features/sesion/consultas';
 import { Iniciales } from '@/features/sesion/pantalla-ingreso';
+import { useEstadoFacturacion } from '@/features/facturacion/consultas';
+import { avisoDelCertificado, type AvisoCertificado } from '@compartido/certificado';
 
 interface Seccion {
   ruta: string;
@@ -37,12 +39,18 @@ const REPORTES: Seccion = { ruta: '/reportes', nombre: 'Reportes', icono: ChartC
 
 const AJUSTES: Seccion = { ruta: '/ajustes', nombre: 'Ajustes', icono: Settings };
 
-function Boton({ seccion }: { seccion: Seccion }) {
+function Boton({ seccion, aviso = null }: { seccion: Seccion; aviso?: AvisoCertificado }) {
   const Icono = seccion.icono;
   const contenido = (
     <>
       <Icono className="size-[22px]" strokeWidth={1.9} />
       <span className="text-[12px] font-semibold tracking-wide">{seccion.nombre}</span>
+      {aviso && (
+        <>
+          <span aria-hidden="true" className={cn('absolute top-2.5 right-5 size-2.5 rounded-full ring-2 ring-riel', aviso === 'vencido' ? 'bg-rojo' : 'bg-mostaza')} />
+          <span className="sr-only">{aviso === 'vencido' ? 'Certificado de ARCA vencido' : 'Certificado de ARCA por vencer'}</span>
+        </>
+      )}
     </>
   );
   const base =
@@ -128,6 +136,8 @@ function Atendiendo() {
 
 export function Riel() {
   const { esDueno } = useUsuario();
+  const facturacion = useEstadoFacturacion();
+  const aviso = esDueno && facturacion.data?.activa ? avisoDelCertificado(facturacion.data.certificadoVenceEnDias) : null;
   return (
     <nav
       aria-label="Secciones"
@@ -139,7 +149,7 @@ export function Riel() {
       ))}
       <Boton seccion={esDueno ? REPORTES : { ...REPORTES, llegaEn: 'Solo el dueño' }} />
       <div className="mt-auto flex w-full flex-col items-center gap-4">
-        <Boton seccion={esDueno ? AJUSTES : { ...AJUSTES, llegaEn: 'Solo el dueño' }} />
+        <Boton seccion={esDueno ? AJUSTES : { ...AJUSTES, llegaEn: 'Solo el dueño' }} aviso={aviso} />
         <Atendiendo />
         <Reloj />
       </div>

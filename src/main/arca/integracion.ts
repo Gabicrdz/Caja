@@ -7,6 +7,8 @@ import type { z } from 'zod';
 import type { esquemaArca } from '@compartido/esquemas';
 import type { AmbienteArca, EstadoArca, EstadoFacturacion, PasoPruebaArca, PedidoCertificado } from '@compartido/tipos';
 import type { BaseDeDatos } from '../db/conexion';
+import { diasParaVencer } from '@compartido/certificado';
+import { fechaLocal } from '../servicios/fechas';
 import { guardarDatosArca, obtenerDatosArca } from '../servicios/configuracion';
 import { ErrorDeUsuario } from '../servicios/errores';
 import { contarPendientes, type Autorizador } from '../servicios/facturacion';
@@ -105,6 +107,7 @@ export function estadoFacturacion(db: BaseDeDatos): EstadoFacturacion {
     ambiente: e.ambiente,
     condicionIva: e.condicionIva,
     pendientes: contarPendientes(db),
+    certificadoVenceEnDias: e.tieneCertificado ? diasParaVencer(e.vencimientoCertificado, fechaLocal()) : null,
   };
 }
 

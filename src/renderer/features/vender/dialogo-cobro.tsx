@@ -289,6 +289,11 @@ export function DialogoCobro({
                     <Checkbox checked={facturar} onCheckedChange={(v) => setFacturar(v === true)} aria-label="Facturar con ARCA" />
                     Emitir factura electrónica (ARCA)
                   </label>
+                  {facturar && (estadoFactura.data?.certificadoVenceEnDias ?? 0) < 0 && (
+                    <p role="alert" className="rounded-lg bg-rojo-suave px-3 py-2 text-[13px] font-semibold text-rojo">
+                      El certificado de ARCA venció: la factura va a quedar pendiente. Avisale al dueño (Ajustes → Facturación electrónica).
+                    </p>
+                  )}
                   {facturar && <SelectorReceptor valor={receptor} alCambiar={setReceptor} error={errorReceptor} />}
                 </div>
               )}

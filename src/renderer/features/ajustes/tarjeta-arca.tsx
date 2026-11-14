@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Check, FileKey, Plug, X } from 'lucide-react';
 import { cuitConGuiones } from '@compartido/cuit';
+import { avisoDelCertificado, diasParaVencer, textoDelAviso } from '@compartido/certificado';
 import { esquemaArca } from '@compartido/esquemas';
 import type { AmbienteArca, CondicionIvaEmisor, PasoPruebaArca, PedidoCertificado } from '@compartido/tipos';
 import { Badge } from '@/components/ui/badge';
@@ -98,6 +99,9 @@ export function TarjetaArca() {
   // Los archivos se guardan por ambiente: si se cambió el ambiente sin guardar, primero se guarda.
   const ambienteSinGuardar = !!e && ambiente !== e.ambiente;
   const puedePedir = !!e && !hayCambio && !!e.cuit && !!e.razonSocial.trim();
+  const hoyLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+  const diasCert = e?.tieneCertificado ? diasParaVencer(e.vencimientoCertificado, hoyLocal) : null;
+  const avisoCert = avisoDelCertificado(diasCert);
   const listo = !!e && e.tieneCertificado && e.tieneClave && !!e.cuit;
 
   return (
@@ -206,6 +210,11 @@ export function TarjetaArca() {
             alElegir={() => elegir.mutate('certificado')}
           />
           <ArchivoCargado titulo="Clave privada (.key)" cargado={!!e?.tieneClave} deshabilitado={ambienteSinGuardar || elegir.isPending} alElegir={() => elegir.mutate('clave')} />
+          {avisoCert && (
+            <p role="alert" className={`col-span-2 rounded-lg px-3 py-2 text-[13px] font-semibold ${avisoCert === 'vencido' ? 'bg-rojo-suave text-rojo' : 'bg-mostaza-suave text-tinta'}`}>
+              {textoDelAviso(e?.vencimientoCertificado ?? null, diasCert)} Pasos: "Hacer uno nuevo" en el paso 1, subir el pedido en ARCA y cargar el certificado nuevo. Conviene hacerlo fuera del horario de venta.
+            </p>
+          )}
           {ambienteSinGuardar && <p className="col-span-2 text-[13px] text-tinta-suave">Guardá el cambio de ambiente antes de elegir los archivos: cada ambiente tiene los suyos.</p>}
         </div>
 

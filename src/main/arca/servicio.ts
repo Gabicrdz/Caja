@@ -86,6 +86,16 @@ export class ServicioArca {
     } catch {
       throw new ErrorDeArca('No se pudo leer el certificado o la clave. Volvé a elegirlos en Ajustes.');
     }
+    // Con el certificado vencido ARCA devuelve un error confuso: se avisa antes y claro.
+    try {
+      const vence = new Date(new X509Certificate(certificadoPem).validTo);
+      if (vence.getTime() < this.ahora()) {
+        const f = vence.toISOString().slice(0, 10).split('-').reverse().join('/');
+        throw new ErrorDeArca(`El certificado venció el ${f}. Hay que generar uno nuevo en Ajustes → ARCA.`);
+      }
+    } catch (e) {
+      if (e instanceof ErrorDeArca) throw e;
+    }
     const ticket = await pedirTicket({
       ambiente: this.dep.config.ambiente,
       certificadoPem,

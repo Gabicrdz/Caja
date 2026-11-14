@@ -287,6 +287,8 @@ export interface EstadoFacturacion {
   condicionIva: CondicionIvaEmisor;
   /** Pedidos cobrados que quedaron sin facturar por un error de ARCA. */
   pendientes: number;
+  /** Días que le quedan al certificado (negativo si ya venció); null si no hay certificado cargado. */
+  certificadoVenceEnDias: number | null;
 }
 
 /** Resultado de generar la clave y el pedido de certificado desde Ajustes → ARCA. */
