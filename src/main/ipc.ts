@@ -44,7 +44,7 @@ import {
   resumenDelDia,
 } from './servicios/pedidos';
 import { guardarImpresion, guardarLocal, obtenerConfiguracion, obtenerDatosArca } from './servicios/configuracion';
-import { autorizadorArca, elegirArchivoArca, estadoArca, estadoFacturacion, guardarArca, probarArca } from './arca/integracion';
+import { autorizadorArca, elegirArchivoArca, estadoArca, generarPedidoArca, estadoFacturacion, guardarArca, probarArca } from './arca/integracion';
 import { anularConNotaDeCredito, descartarPendiente, facturarPedido } from './servicios/facturacion';
 import { cargarDemo, hayPedidos } from './servicios/demo';
 import { abrirCarpetaCopias, elegirCopia, estadoCopias, exportarCopia, restaurarCopiaElegida } from './copias';
@@ -260,6 +260,7 @@ export function registrarCanales(info: () => { version: string; baseDeDatos: str
     return null;
   });
   manejar(CANALES.arcaElegirArchivo, 'dueno', z.tuple([esquemaArchivoArca, ambienteArca]), (archivo, ambiente) => elegirArchivoArca(archivo, ambiente));
+  manejar(CANALES.arcaGenerarPedido, 'dueno', z.tuple([ambienteArca, z.boolean()]), (ambiente, reemplazar) => generarPedidoArca(db(), ambiente, reemplazar));
   manejar(CANALES.arcaProbar, 'dueno', nada, () => probarArca(db()));
 
   // ── Facturar con ARCA (el cajero también: es parte de cobrar) ──

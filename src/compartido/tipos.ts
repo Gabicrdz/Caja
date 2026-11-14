@@ -289,6 +289,14 @@ export interface EstadoFacturacion {
   pendientes: number;
 }
 
+/** Resultado de generar la clave y el pedido de certificado desde Ajustes → ARCA. */
+export interface PedidoCertificado {
+  alias: string;
+  /** Dónde quedó el archivo .csr (Documentos\Caja\ARCA). */
+  ruta: string;
+  reutilizoClave: boolean;
+}
+
 export interface PasoPruebaArca {
   paso: string;
   ok: boolean;

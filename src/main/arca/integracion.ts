@@ -1,16 +1,17 @@
 // La parte de ARCA que necesita Electron: carpeta del programa y diálogo para elegir archivos.
 // La lógica está en los otros archivos de esta carpeta y tiene pruebas.
-import { app, BrowserWindow, dialog } from 'electron';
-import { readFileSync } from 'node:fs';
+import { app, BrowserWindow, dialog, shell } from 'electron';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { z } from 'zod';
 import type { esquemaArca } from '@compartido/esquemas';
-import type { AmbienteArca, EstadoArca, EstadoFacturacion, PasoPruebaArca } from '@compartido/tipos';
+import type { AmbienteArca, EstadoArca, EstadoFacturacion, PasoPruebaArca, PedidoCertificado } from '@compartido/tipos';
 import type { BaseDeDatos } from '../db/conexion';
 import { guardarDatosArca, obtenerDatosArca } from '../servicios/configuracion';
 import { ErrorDeUsuario } from '../servicios/errores';
 import { contarPendientes, type Autorizador } from '../servicios/facturacion';
 import { ErrorDeArchivo, existeArchivo, guardarTicket, importarArchivo, leerTicket, rutaDe, vencimientoDelCertificado, type ArchivoArca } from './almacen';
+import { generarPedido } from './csr';
 import { ServicioArca } from './servicio';
 import type { ConfigArca } from './tipos';
 import { transporteHttps } from './transporte';
@@ -54,6 +55,24 @@ export async function elegirArchivoArca(archivo: ArchivoArca, ambiente: Ambiente
     throw e;
   }
   return true;
+}
+
+/** Crea la clave (si falta) y el pedido de certificado; deja el .csr en Documentos\\Caja\\ARCA y abre esa carpeta. */
+export function generarPedidoArca(db: BaseDeDatos, ambiente: AmbienteArca, reemplazar: boolean): PedidoCertificado {
+  const d = obtenerDatosArca(db);
+  let r;
+  try {
+    r = generarPedido(carpetaBase(), ambiente, { cuit: d.cuit, razonSocial: d.razonSocial }, reemplazar);
+  } catch (e) {
+    if (e instanceof ErrorDeArchivo) throw new ErrorDeUsuario(e.message);
+    throw e;
+  }
+  const carpeta = path.join(app.getPath('documents'), 'Caja', 'ARCA');
+  mkdirSync(carpeta, { recursive: true });
+  const ruta = path.join(carpeta, `pedido-${r.alias}.csr`);
+  writeFileSync(ruta, r.csr, 'utf8');
+  shell.showItemInFolder(ruta);
+  return { alias: r.alias, ruta, reutilizoClave: r.reutilizoClave };
 }
 
 /** El servicio ya armado con lo que hay guardado (lo usa la prueba de conexión y, después, el cobro). */

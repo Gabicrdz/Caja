@@ -81,6 +81,7 @@ const api: ApiCaja = {
     estado: () => pedir(CANALES.arcaEstado),
     guardar: (datos) => pedir(CANALES.arcaGuardar, datos),
     elegirArchivo: (archivo, ambiente) => pedir(CANALES.arcaElegirArchivo, archivo, ambiente),
+    generarPedido: (ambiente, reemplazar) => pedir(CANALES.arcaGenerarPedido, ambiente, reemplazar),
     probar: () => pedir(CANALES.arcaProbar),
   },
   facturacion: {

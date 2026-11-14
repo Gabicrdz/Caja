@@ -4,10 +4,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Check, Plug, X } from 'lucide-react';
+import { Check, FileKey, Plug, X } from 'lucide-react';
 import { cuitConGuiones } from '@compartido/cuit';
 import { esquemaArca } from '@compartido/esquemas';
-import type { AmbienteArca, CondicionIvaEmisor, PasoPruebaArca } from '@compartido/tipos';
+import type { AmbienteArca, CondicionIvaEmisor, PasoPruebaArca, PedidoCertificado } from '@compartido/tipos';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Campo } from '@/components/ui/campo';
@@ -31,6 +31,8 @@ export function TarjetaArca() {
   const [inicio, setInicio] = useState('');
   const [error, setError] = useState('');
   const [pasos, setPasos] = useState<PasoPruebaArca[] | null>(null);
+  const [pedido, setPedido] = useState<PedidoCertificado | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
 
   const e = estado.data;
   useEffect(() => {
@@ -66,6 +68,17 @@ export function TarjetaArca() {
     onError: (err) => toast.error(err.message),
   });
 
+  const generar = useMutation({
+    mutationFn: (reemplazar: boolean) => desenvolver(caja().arca.generarPedido(e!.ambiente, reemplazar)),
+    onSuccess: async (r) => {
+      setPedido(r);
+      setConfirmando(false);
+      setPasos(null);
+      await cliente.invalidateQueries({ queryKey: CLAVE });
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   const probar = useMutation({
     mutationFn: () => desenvolver(caja().arca.probar()),
     onSuccess: setPasos,
@@ -84,6 +97,7 @@ export function TarjetaArca() {
   const hayCambio = !!e && (activa !== e.activa || ambiente !== e.ambiente || cuit.replace(/\D/g, '') !== e.cuit || Number(punto) !== e.puntoVenta || condicion !== e.condicionIva || razonSocial.trim() !== e.razonSocial || ingresosBrutos.trim() !== e.ingresosBrutos || inicio !== e.inicioActividades);
   // Los archivos se guardan por ambiente: si se cambió el ambiente sin guardar, primero se guarda.
   const ambienteSinGuardar = !!e && ambiente !== e.ambiente;
+  const puedePedir = !!e && !hayCambio && !!e.cuit && !!e.razonSocial.trim();
   const listo = !!e && e.tieneCertificado && e.tieneClave && !!e.cuit;
 
   return (
@@ -139,6 +153,49 @@ export function TarjetaArca() {
         <Campo etiqueta="Inicio de actividades" htmlFor="arca-inicio">
           <Input id="arca-inicio" type="date" value={inicio} onChange={(ev) => setInicio(ev.target.value)} />
         </Campo>
+
+        <div className="col-span-2 flex flex-col gap-3 rounded-lg border border-linea p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-semibold">1. Pedido de certificado</span>
+              <span className="text-[13px] text-tinta-suave">
+                Crea la clave privada y el archivo (.csr) que se sube a ARCA para obtener el certificado. Usa el CUIT y el nombre guardados arriba.
+              </span>
+            </div>
+            {listo && !confirmando ? (
+              <Button type="button" variant="outline" size="sm" disabled={!puedePedir || ambienteSinGuardar} onClick={() => setConfirmando(true)}>
+                <FileKey /> Hacer uno nuevo
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" size="sm" disabled={!puedePedir || ambienteSinGuardar || generar.isPending} onClick={() => generar.mutate(listo)}>
+                <FileKey /> {generar.isPending ? 'Generando…' : 'Generar pedido'}
+              </Button>
+            )}
+          </div>
+          {!puedePedir && <p className="text-[13px] text-tinta-suave">Cargá el CUIT y el nombre o razón social, y guardá los cambios.</p>}
+          {confirmando && (
+            <p role="alert" className="text-[13px] font-semibold text-rojo">
+              Ya hay un certificado y una clave cargados. Si seguís, hay que pedir otro certificado en ARCA y los actuales quedan como copia (.anterior).{' '}
+              <button type="button" className="underline" onClick={() => generar.mutate(true)}>
+                Sí, generar uno nuevo
+              </button>{' '}
+              ·{' '}
+              <button type="button" className="underline" onClick={() => setConfirmando(false)}>
+                Cancelar
+              </button>
+            </p>
+          )}
+          {pedido && (
+            <div role="status" className="rounded-md bg-secondary p-3 text-[13px]">
+              <p className="font-semibold">Pedido listo. Nombre (alias) para ARCA: {pedido.alias}</p>
+              <p className="text-tinta-suave">Archivo: {pedido.ruta}</p>
+              <p className="text-tinta-suave">
+                {pedido.reutilizoClave ? 'Se volvió a usar la clave que ya estaba guardada. ' : 'La clave quedó guardada en el programa. '}
+                Subí ese archivo en ARCA, descargá el certificado (.crt) y cargalo abajo.
+              </p>
+            </div>
+          )}
+        </div>
 
         <div className="col-span-2 grid grid-cols-2 gap-4 rounded-lg border border-linea p-4">
           <ArchivoCargado

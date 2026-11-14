@@ -29,6 +29,7 @@ import type {
   EstadoPedido,
   Impresora,
   PasoPruebaArca,
+  PedidoCertificado,
   InfoCopia,
   Menu,
   PedidoCreado,
@@ -133,6 +134,8 @@ export interface ApiCaja {
     guardar(datos: DatosArca): Promise<Respuesta<null>>;
     /** Abre "Elegir archivo"; false si se canceló. Va a la carpeta del ambiente indicado. */
     elegirArchivo(archivo: 'certificado' | 'clave', ambiente: 'homologacion' | 'produccion'): Promise<Respuesta<boolean>>;
+    /** Crea la clave y el pedido de certificado (.csr) con los datos guardados y abre la carpeta. */
+    generarPedido(ambiente: 'homologacion' | 'produccion', reemplazar: boolean): Promise<Respuesta<PedidoCertificado>>;
     /** Recorre la conexión paso a paso y dice dónde falla. */
     probar(): Promise<Respuesta<PasoPruebaArca[]>>;
   };
@@ -222,6 +225,7 @@ export const CANALES = {
   arcaEstado: 'arca:estado',
   arcaGuardar: 'arca:guardar',
   arcaElegirArchivo: 'arca:elegir-archivo',
+  arcaGenerarPedido: 'arca:generar-pedido',
   arcaProbar: 'arca:probar',
   facturacionEstado: 'facturacion:estado',
   facturacionFacturar: 'facturacion:facturar',
