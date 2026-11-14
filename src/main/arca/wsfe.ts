@@ -7,6 +7,7 @@ import {
   TIPO_COMPROBANTE,
   type Ambiente,
   type ComprobanteAutorizado,
+  type ComprobanteConsultado,
   type DatosComprobante,
   type MensajeArca,
   type ResultadoArca,
@@ -152,6 +153,45 @@ export function leerRespuestaSolicitar(xml: string, tipo: number, puntoVenta: nu
   };
 }
 
+export function sobreConsultar(c: Credenciales, puntoVenta: number, tipo: number, numero: number): string {
+  return sobre('FECompConsultar', `${auth(c)}<ar:FeCompConsReq><ar:CbteTipo>${tipo}</ar:CbteTipo><ar:CbteNro>${numero}</ar:CbteNro><ar:PtoVta>${puntoVenta}</ar:PtoVta></ar:FeCompConsReq>`);
+}
+
+const aFecha = (t: string | null) => (t && t.length === 8 ? `${t.slice(0, 4)}-${t.slice(4, 6)}-${t.slice(6, 8)}` : '');
+/** "123.45" → 12345 (sin errores de coma flotante). */
+const aCentavos = (t: string | null) => {
+  const [e = '0', d = ''] = (t ?? '0').split('.');
+  return Number(e) * 100 + Number((d + '00').slice(0, 2)) * (e.startsWith('-') ? -1 : 1);
+};
+
+/** Lee FECompConsultar. Devuelve null si ARCA dice que ese número no existe (código 602). */
+export function leerRespuestaConsultar(xml: string, tipo: number, puntoVenta: number, numero: number): ComprobanteConsultado | null {
+  try {
+    fallaSi(xml);
+  } catch (e) {
+    if (e instanceof ErrorDeArca && e.codigo === '602') return null;
+    throw e;
+  }
+  const r = etiqueta(xml, 'ResultGet');
+  if (!r) return null;
+  const aso = etiqueta(r, 'CbteAsoc');
+  const cae = etiqueta(r, 'CodAutorizacion') ?? '';
+  if (!cae) return null;
+  return {
+    tipo,
+    puntoVenta,
+    numero,
+    docTipo: Number(etiqueta(r, 'DocTipo') ?? 0),
+    docNro: etiqueta(r, 'DocNro') ?? '0',
+    fecha: aFecha(etiqueta(r, 'CbteFch')),
+    totalCentavos: aCentavos(etiqueta(r, 'ImpTotal')),
+    cae,
+    vencimientoCae: aFecha(etiqueta(r, 'FchVto')),
+    resultado: (etiqueta(r, 'Resultado') ?? 'A') as ResultadoArca,
+    asociado: aso ? { tipo: Number(etiqueta(aso, 'Tipo') ?? 0), puntoVenta: Number(etiqueta(aso, 'PtoVta') ?? 0), numero: Number(etiqueta(aso, 'Nro') ?? 0) } : undefined,
+  };
+}
+
 export class ClienteWsfe {
   constructor(
     private readonly ambiente: Ambiente,
@@ -174,6 +214,12 @@ export class ClienteWsfe {
     const xml = await this.llamar('FECompUltimoAutorizado', sobre('FECompUltimoAutorizado', `${auth(c)}<ar:PtoVta>${puntoVenta}</ar:PtoVta><ar:CbteTipo>${tipo}</ar:CbteTipo>`));
     fallaSi(xml);
     return Number(etiqueta(xml, 'CbteNro') ?? 0);
+  }
+
+  /** Un comprobante que ya está en ARCA (null si ese número no existe). */
+  async consultar(c: Credenciales, puntoVenta: number, tipo: number, numero: number): Promise<ComprobanteConsultado | null> {
+    const xml = await this.llamar('FECompConsultar', sobreConsultar(c, puntoVenta, tipo, numero));
+    return leerRespuestaConsultar(xml, tipo, puntoVenta, numero);
   }
 
   /** Autoriza UN comprobante con el número que corresponde. */

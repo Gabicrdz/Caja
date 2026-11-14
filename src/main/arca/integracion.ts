@@ -112,5 +112,5 @@ export function estadoFacturacion(db: BaseDeDatos): EstadoFacturacion {
 export function autorizadorArca(db: BaseDeDatos): Autorizador {
   const { activa, ambiente, cuit, puntoVenta, condicionIva } = obtenerDatosArca(db);
   const servicio = crearServicioArca(db);
-  return { config: { activa, ambiente, cuit, puntoVenta, condicionIva }, autorizar: (datos) => servicio.autorizar(datos) };
+  return { config: { activa, ambiente, cuit, puntoVenta, condicionIva }, autorizar: (datos) => servicio.autorizar(datos), ultimoAutorizado: (t) => servicio.ultimoAutorizado(t), consultar: (t, n) => servicio.consultar(t, n) };
 }

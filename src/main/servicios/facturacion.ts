@@ -6,13 +6,13 @@
 //   factura queda "pendiente" con el motivo, para reintentar.
 // - Una factura autorizada no se borra ni se edita (es un documento fiscal).
 // - Un pedido no puede tener dos facturas: mientras se está facturando, se bloquea el segundo intento.
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 import type { BaseDeDatos } from '../db/conexion';
 import { comprobantes, facturasPendientes } from '../db/esquema';
 import { notaDeCreditoDe, tipoDeFactura } from '../arca/servicio';
 import { ErrorDeArca } from '../arca/wsaa';
-import type { ComprobanteAutorizado, DatosComprobante } from '../arca/tipos';
+import type { ComprobanteAutorizado, ComprobanteConsultado, DatosComprobante } from '../arca/tipos';
 import type { ComprobanteResumen, EstadoArca, PedidoDetalle } from '@compartido/tipos';
 import { ErrorDeUsuario } from './errores';
 import { fechaLocal } from './fechas';
@@ -30,8 +30,60 @@ export const CONSUMIDOR_FINAL: Receptor = { docTipo: 99, docNro: '0', condicionI
 export interface Autorizador {
   config: Pick<EstadoArca, 'activa' | 'ambiente' | 'cuit' | 'puntoVenta' | 'condicionIva'>;
   autorizar(datos: DatosComprobante): Promise<ComprobanteAutorizado>;
+  /** Últimas dos operaciones: sirven para recuperar comprobantes que ARCA autorizó y la Caja no llegó a guardar. */
+  ultimoAutorizado?(tipo: number): Promise<number>;
+  consultar?(tipo: number, numero: number): Promise<ComprobanteConsultado | null>;
 }
 
+/** Cuántos números hacia atrás se revisan en ARCA al buscar un comprobante que no se guardó. */
+const VENTANA_RECUPERO = 20;
+
+/**
+ * ¿ARCA autorizó un comprobante que la Caja no tiene guardado? Pasa si se cortó internet justo
+ * después de que ARCA lo autorizó, o si se cortó la luz antes de guardarlo. Se miran los números
+ * que ARCA tiene y la Caja no, y se devuelve el primero que coincide con `coincide`.
+ * Si el autorizador no sabe consultar (o ARCA no contesta), devuelve null y se sigue como siempre.
+ */
+async function buscarEnArca(
+  db: BaseDeDatos,
+  autorizador: Autorizador,
+  tipo: number,
+  coincide: (c: ComprobanteConsultado) => boolean,
+): Promise<ComprobanteConsultado | null> {
+  const { ultimoAutorizado, consultar } = autorizador;
+  if (!ultimoAutorizado || !consultar) return null;
+  const { ambiente, cuit, puntoVenta } = autorizador.config;
+  try {
+    const ultimo = await ultimoAutorizado.call(autorizador, tipo);
+    const mios = db
+      .select({ numero: comprobantes.numero })
+      .from(comprobantes)
+      .where(and(eq(comprobantes.tipo, tipo), eq(comprobantes.puntoVenta, puntoVenta), eq(comprobantes.ambiente, ambiente), eq(comprobantes.cuitEmisor, cuit), gt(comprobantes.numero, ultimo - VENTANA_RECUPERO)))
+      .all()
+      .map((f) => f.numero);
+    for (let n = ultimo; n > Math.max(0, ultimo - VENTANA_RECUPERO); n--) {
+      if (mios.includes(n)) continue;
+      const c = await consultar.call(autorizador, tipo, n);
+      if (c && c.resultado === 'A' && coincide(c)) return c;
+    }
+  } catch {
+    // Sin conexión o sin respuesta: no se puede revisar ahora. Se sigue con el flujo normal.
+  }
+  return null;
+}
+
+const comoAutorizado = (c: ComprobanteConsultado): ComprobanteAutorizado => ({
+  resultado: 'A',
+  tipo: c.tipo,
+  puntoVenta: c.puntoVenta,
+  numero: c.numero,
+  cae: c.cae,
+  vencimientoCae: c.vencimientoCae,
+  observaciones: [],
+});
+
+/** Texto del pendiente mientras no se sabe si ARCA llegó a autorizar. */
+const MOTIVO_SIN_RESPUESTA = 'No se confirmó la respuesta de ARCA. Al reintentar se revisa en ARCA antes de emitir otra factura.';
 const ahoraSql = sql`(datetime('now', 'localtime'))`;
 /** Pedidos que se están facturando en este momento (evita facturar dos veces con un doble clic). */
 const enCurso = new Set<number>();
@@ -74,25 +126,32 @@ export function facturarPedido(
 
     enCurso.add(pedidoId);
     try {
+      // Antes de hablar con ARCA se deja anotado el intento: si se corta la luz o internet justo
+      // después de que ARCA autoriza, el pedido queda "pendiente" y el reintento revisa en ARCA.
+      const habiaIntento = !!anterior;
+      db.insert(facturasPendientes)
+        .values({ pedidoId, docTipo: cliente.docTipo, docNro: cliente.docNro, condicionIvaReceptor: cliente.condicionIva, ultimoError: MOTIVO_SIN_RESPUESTA })
+        .onConflictDoUpdate({
+          target: facturasPendientes.pedidoId,
+          set: { docTipo: cliente.docTipo, docNro: cliente.docNro, condicionIvaReceptor: cliente.condicionIva, intentos: sql`${facturasPendientes.intentos} + 1`, actualizadoEn: ahoraSql },
+        })
+        .run();
       let autorizado: ComprobanteAutorizado;
+      let fechaComprobante = datos.fecha;
       try {
-        autorizado = await autorizador.autorizar(datos);
+        // Reintento: puede que ARCA ya haya autorizado el comprobante en el intento anterior.
+        const yaEmitido = habiaIntento
+          ? await buscarEnArca(db, autorizador, datos.tipo, (c) => c.totalCentavos === datos.totalCentavos && c.docTipo === datos.docTipo && c.docNro === (datos.docNro || '0') && !c.asociado)
+          : null;
+        if (yaEmitido) {
+          autorizado = comoAutorizado(yaEmitido);
+          fechaComprobante = yaEmitido.fecha || datos.fecha;
+        } else {
+          autorizado = await autorizador.autorizar(datos);
+        }
       } catch (e) {
         const motivo = e instanceof ErrorDeArca || e instanceof Error ? e.message : 'Error desconocido.';
-        db.insert(facturasPendientes)
-          .values({ pedidoId, docTipo: cliente.docTipo, docNro: cliente.docNro, condicionIvaReceptor: cliente.condicionIva, ultimoError: motivo })
-          .onConflictDoUpdate({
-            target: facturasPendientes.pedidoId,
-            set: {
-              docTipo: cliente.docTipo,
-              docNro: cliente.docNro,
-              condicionIvaReceptor: cliente.condicionIva,
-              ultimoError: motivo,
-              intentos: sql`${facturasPendientes.intentos} + 1`,
-              actualizadoEn: ahoraSql,
-            },
-          })
-          .run();
+        db.update(facturasPendientes).set({ ultimoError: motivo, actualizadoEn: ahoraSql }).where(eq(facturasPendientes.pedidoId, pedidoId)).run();
         throw new ErrorDeUsuario(`El pedido #${pedido.numero} está cobrado, pero no se pudo facturar: ${motivo} Queda pendiente para reintentar.`);
       }
 
@@ -103,7 +162,7 @@ export function facturarPedido(
             tipo: autorizado.tipo,
             puntoVenta: autorizado.puntoVenta,
             numero: autorizado.numero,
-            fecha: datos.fecha,
+            fecha: fechaComprobante,
             totalCentavos: datos.totalCentavos,
             docTipo: datos.docTipo,
             docNro: datos.docNro,
@@ -196,8 +255,21 @@ export async function anularConNotaDeCredito(
   enCurso.add(pedidoId);
   try {
     let autorizado: ComprobanteAutorizado;
+    let fechaNota = datos.fecha;
     try {
-      autorizado = await autorizador.autorizar(datos);
+      // Si un intento anterior se cortó después de que ARCA emitió la nota, se la recupera en vez de emitir otra.
+      const yaEmitida = await buscarEnArca(
+        db,
+        autorizador,
+        datos.tipo,
+        (c) => c.totalCentavos === datos.totalCentavos && c.asociado?.tipo === fila.tipo && c.asociado.puntoVenta === fila.puntoVenta && c.asociado.numero === fila.numero,
+      );
+      if (yaEmitida) {
+        autorizado = comoAutorizado(yaEmitida);
+        fechaNota = yaEmitida.fecha || datos.fecha;
+      } else {
+        autorizado = await autorizador.autorizar(datos);
+      }
     } catch (e) {
       const motivoError = e instanceof Error ? e.message : 'Error desconocido.';
       throw new ErrorDeUsuario(`No se pudo emitir la nota de crédito de la ${nombre}: ${motivoError} El pedido NO se anuló; probá de nuevo.`);
@@ -209,7 +281,7 @@ export async function anularConNotaDeCredito(
           tipo: autorizado.tipo,
           puntoVenta: autorizado.puntoVenta,
           numero: autorizado.numero,
-          fecha: datos.fecha,
+          fecha: fechaNota,
           totalCentavos: datos.totalCentavos,
           docTipo: datos.docTipo,
           docNro: datos.docNro,

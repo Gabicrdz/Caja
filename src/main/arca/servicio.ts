@@ -5,7 +5,7 @@ import { X509Certificate } from 'node:crypto';
 import { ClienteWsfe } from './wsfe';
 import type { Transporte } from './transporte';
 import { ErrorDeArca, pedirTicket, type Ticket } from './wsaa';
-import { NOMBRE_COMPROBANTE, TIPO_COMPROBANTE, type ComprobanteAutorizado, type ConfigArca, type DatosComprobante } from './tipos';
+import { NOMBRE_COMPROBANTE, TIPO_COMPROBANTE, type ComprobanteAutorizado, type ComprobanteConsultado, type ConfigArca, type DatosComprobante } from './tipos';
 
 export interface DependenciasArca {
   config: ConfigArca;
@@ -34,7 +34,7 @@ export function problemaDeConfig(c: ConfigArca): string | null {
 }
 
 /** Tipo de factura que corresponde al emisor: monotributo siempre C; responsable inscripto A o B según el cliente. */
-export function tipoDeFactura(c: ConfigArca, condicionIvaReceptor: number): number {
+export function tipoDeFactura(c: Pick<ConfigArca, 'condicionIva'>, condicionIvaReceptor: number): number {
   if (c.condicionIva === 'monotributo') return TIPO_COMPROBANTE.facturaC;
   return condicionIvaReceptor === 1 ? TIPO_COMPROBANTE.facturaA : TIPO_COMPROBANTE.facturaB;
 }
@@ -153,20 +153,33 @@ export class ServicioArca {
     return pasos;
   }
 
+  /** Hace una operación con ticket; si venció (600/601), pide otro y repite UNA vez. */
+  private async conTicket<T>(operacion: (cred: Awaited<ReturnType<ServicioArca['credenciales']>>) => Promise<T>): Promise<T> {
+    try {
+      return await operacion(await this.credenciales());
+    } catch (e) {
+      if (e instanceof ErrorDeArca && (e.codigo === '600' || e.codigo === '601') && this.ticket) {
+        return operacion(await this.credenciales(true));
+      }
+      throw e;
+    }
+  }
+
   /**
    * Autoriza un comprobante. Si el ticket venció, pide otro y reintenta una vez.
    * El número lo decide ARCA (último + 1); no hay que llevar la cuenta acá.
    */
-  async autorizar(datos: DatosComprobante): Promise<ComprobanteAutorizado> {
-    const c = this.dep.config;
-    try {
-      return await this.wsfe.autorizar(await this.credenciales(), c.puntoVenta, datos);
-    } catch (e) {
-      // Código 600/601: ticket vencido o inválido. Se pide uno nuevo una sola vez.
-      if (e instanceof ErrorDeArca && (e.codigo === '600' || e.codigo === '601') && this.ticket) {
-        return this.wsfe.autorizar(await this.credenciales(true), c.puntoVenta, datos);
-      }
-      throw e;
-    }
+  autorizar(datos: DatosComprobante): Promise<ComprobanteAutorizado> {
+    return this.conTicket((cred) => this.wsfe.autorizar(cred, this.dep.config.puntoVenta, datos));
+  }
+
+  /** Último número que ARCA autorizó para este punto de venta y tipo. */
+  ultimoAutorizado(tipo: number): Promise<number> {
+    return this.conTicket((cred) => this.wsfe.ultimoAutorizado(cred, this.dep.config.puntoVenta, tipo));
+  }
+
+  /** Un comprobante tal como lo tiene ARCA, o null si no existe. */
+  consultar(tipo: number, numero: number): Promise<ComprobanteConsultado | null> {
+    return this.conTicket((cred) => this.wsfe.consultar(cred, this.dep.config.puntoVenta, tipo, numero));
   }
 }

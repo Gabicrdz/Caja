@@ -103,3 +103,21 @@ export interface ComprobanteAutorizado {
   vencimientoCae: string;
   observaciones: MensajeArca[];
 }
+
+/** Un comprobante tal como lo tiene ARCA (respuesta de FECompConsultar). */
+export interface ComprobanteConsultado {
+  tipo: number;
+  puntoVenta: number;
+  numero: number;
+  docTipo: number;
+  docNro: string;
+  /** AAAA-MM-DD. */
+  fecha: string;
+  totalCentavos: number;
+  cae: string;
+  /** AAAA-MM-DD. */
+  vencimientoCae: string;
+  resultado: ResultadoArca;
+  /** Comprobante al que está asociado (solo notas de crédito). */
+  asociado?: { tipo: number; puntoVenta: number; numero: number };
+}
