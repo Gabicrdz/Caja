@@ -1,6 +1,6 @@
 // CUIT / CUIL: 11 números; el último es un dígito verificador (módulo 11).
 
-/** Deja solo los números: "20-44647493-7" → "20446474937". */
+/** Deja solo los números: "20-11111111-2" → "20111111112". */
 export const soloNumeros = (texto: string) => texto.replace(/\D/g, '');
 
 export function cuitValido(cuit: string): boolean {
@@ -12,5 +12,5 @@ export function cuitValido(cuit: string): boolean {
   return digito === Number(cuit[10]);
 }
 
-/** "20446474937" → "20-44647493-7". */
+/** "20111111112" → "20-11111111-2". */
 export const cuitConGuiones = (cuit: string) => (cuit.length === 11 ? `${cuit.slice(0, 2)}-${cuit.slice(2, 10)}-${cuit.slice(10)}` : cuit);

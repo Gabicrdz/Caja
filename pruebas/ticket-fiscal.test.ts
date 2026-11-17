@@ -14,7 +14,7 @@ const huella = (texto: string) =>
 const urlDeEjemplo = urlQr({
   comprobante: { resultado: 'A', tipo: 11, puntoVenta: 1, numero: 1, cae: '86461069119998', vencimientoCae: '2026-11-24', observaciones: [] },
   fecha: '2026-11-14',
-  cuitEmisor: '20446474937',
+  cuitEmisor: '20111111112',
   totalCentavos: $(8000),
   docTipo: 99,
   docNro: '0',
@@ -39,7 +39,7 @@ describe('código QR', () => {
   });
 
   it('el dibujo no cambia (se verificó que un lector de QR lo decodifica)', () => {
-    expect(huella(urlDeEjemplo)).toBe('4eba6619680dd56f28a4cb49650b82fde5fd08e1');
+    expect(huella(urlDeEjemplo)).toBe('16e7d1be56a36b6d093bf00fd994aeed1e32b544');
     expect(huella('hola')).toBe('54222151106bce232495496d00c563a7cbd78986');
     expect(huella('http://192.168.0.10:3000/mozo.html')).toBe('3b268590ba3bb212e5c29c48c04e6dcfc513ab67');
   });
@@ -58,14 +58,14 @@ describe('código QR', () => {
     const [base, p] = urlDeEjemplo.split('?p=');
     expect(base).toBe('https://www.afip.gob.ar/fe/qr/');
     expect(JSON.parse(Buffer.from(p!, 'base64').toString())).toEqual({
-      ver: 1, fecha: '2026-11-14', cuit: 20446474937, ptoVta: 1, tipoCmp: 11, nroCmp: 1, importe: 8000, moneda: 'PES', ctz: 1, tipoDocRec: 99, nroDocRec: 0, tipoCodAut: 'E', codAut: 86461069119998,
+      ver: 1, fecha: '2026-11-14', cuit: 20111111112, ptoVta: 1, tipoCmp: 11, nroCmp: 1, importe: 8000, moneda: 'PES', ctz: 1, tipoDocRec: 99, nroDocRec: 0, tipoCodAut: 'E', codAut: 86461069119998,
     });
   });
 });
 
 const comprobante = (tipo: number, nombre: string, numero: number, extra: Partial<ComprobanteResumen> = {}): ComprobanteResumen => ({
   id: numero, tipo, nombre, puntoVenta: 1, numero, numeroCompleto: `0001-${String(numero).padStart(8, '0')}`, fecha: '2026-11-14', totalCentavos: $(26800),
-  cae: '86461069119998', vencimientoCae: '2026-11-24', docTipo: 99, docNro: '0', condicionIvaReceptor: 5, ambiente: 'homologacion', cuitEmisor: '20446474937', ...extra,
+  cae: '86461069119998', vencimientoCae: '2026-11-24', docTipo: 99, docNro: '0', condicionIvaReceptor: 5, ambiente: 'homologacion', cuitEmisor: '20111111112', ...extra,
 });
 const pedido: PedidoDetalle = {
   id: 1, numero: 12, fecha: '2026-11-14', hora: '21:15', tipo: 'mostrador', mesa: '', clienteNombre: '', clienteTelefono: '', clienteDireccion: '', nota: '',
@@ -74,7 +74,7 @@ const pedido: PedidoDetalle = {
   pagos: [{ medio: 'efectivo', montoCentavos: $(26800), recibidoCentavos: $(26800), vueltoCentavos: 0 }],
   comprobante: null, notaDeCredito: null, facturaPendiente: null,
 };
-const emisor: DatosEmisor = { razonSocial: 'Cardozo Sergio <SRL>', cuit: '20446474937', condicionIva: 'monotributo', ingresosBrutos: 'Exento', inicioActividades: '2024-03-01' };
+const emisor: DatosEmisor = { razonSocial: 'Cardozo Sergio <SRL>', cuit: '20111111112', condicionIva: 'monotributo', ingresosBrutos: 'Exento', inicioActividades: '2024-03-01' };
 const texto = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
 describe('ticket con factura', () => {
@@ -89,7 +89,7 @@ describe('ticket con factura', () => {
     const t = texto(html);
     expect(t).toContain('FACTURA · Cód. 011');
     expect(t).toContain('Nº 0001-00000001');
-    expect(t).toContain('CUIT 20-44647493-7 · Responsable Monotributo');
+    expect(t).toContain('CUIT 20-11111111-2 · Responsable Monotributo');
     expect(t).toContain('Ingresos Brutos: Exento');
     expect(t).toContain('Inicio de actividades: 01/03/2024');
     expect(t).toContain('Cliente: Consumidor Final');

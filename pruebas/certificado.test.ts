@@ -44,7 +44,7 @@ describe('días que le quedan al certificado', () => {
 });
 
 describe('con el certificado vencido', () => {
-  const CONFIG: ConfigArca = { activa: true, ambiente: 'homologacion', cuit: '20446474937', puntoVenta: 1, condicionIva: 'monotributo', rutaCertificado: 'c.crt', rutaClave: 'k.key' };
+  const CONFIG: ConfigArca = { activa: true, ambiente: 'homologacion', cuit: '20111111112', puntoVenta: 1, condicionIva: 'monotributo', rutaCertificado: 'c.crt', rutaClave: 'k.key' };
 
   it('avisa claro, sin llamar a ARCA', async () => {
     const vence = new Date(new X509Certificate(CERTIFICADO_PRUEBA).validTo);

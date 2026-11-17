@@ -8,7 +8,7 @@ import { aliasSugerido, armarCsr, aPem, generarPedido } from '../src/main/arca/c
 import { importarArchivo, rutaDe } from '../src/main/arca/almacen';
 import { CERTIFICADO_PRUEBA, CLAVE_PRUEBA } from './fixtures-arca';
 
-const DATOS = { cuit: '20446474937', razonSocial: 'Pérez Juan, Kiosco "El Sol"' };
+const DATOS = { cuit: '20111111112', razonSocial: 'Pérez Juan, Kiosco "El Sol"' };
 const AHORA = new Date(Date.UTC(2026, 10, 14, 15));
 const carpeta = () => mkdtempSync(path.join(tmpdir(), 'csr-'));
 
@@ -30,7 +30,7 @@ describe('pedido de certificado (CSR)', () => {
       expect(r.stderr + r.stdout).toContain('verify OK');
       expect(r.stdout).toContain('CN=cajaprod1');
       expect(r.stdout).toContain('C=AR');
-      expect(r.stdout).toContain('serialNumber=CUIT 20446474937');
+      expect(r.stdout).toContain('serialNumber=CUIT 20111111112');
       expect(r.stdout).toContain('Kiosco');
     }
     // Sin OpenSSL: al menos la clave pública debe estar adentro tal cual.
@@ -75,8 +75,8 @@ describe('pedido de certificado (CSR)', () => {
 
   it('pide CUIT válido y razón social', () => {
     const base = carpeta();
-    expect(() => generarPedido(base, 'produccion', { cuit: '20446474930', razonSocial: 'X' }, false)).toThrow('CUIT');
-    expect(() => generarPedido(base, 'produccion', { cuit: '20446474937', razonSocial: '  ' }, false)).toThrow('razón social');
+    expect(() => generarPedido(base, 'produccion', { cuit: '20111111110', razonSocial: 'X' }, false)).toThrow('CUIT');
+    expect(() => generarPedido(base, 'produccion', { cuit: '20111111112', razonSocial: '  ' }, false)).toThrow('razón social');
   });
 
   it('un certificado de otra clave se rechaza al cargarlo (flujo completo)', () => {

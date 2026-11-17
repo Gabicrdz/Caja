@@ -24,7 +24,7 @@ const AHORA = Date.UTC(2026, 10, 14, 15, 0, 0); // 14/11/2026 12:00 en Argentina
 const CONFIG: ConfigArca = {
   activa: true,
   ambiente: 'homologacion',
-  cuit: '20446474937',
+  cuit: '20111111112',
   puntoVenta: 1,
   condicionIva: 'monotributo',
   rutaCertificado: 'cert.crt',
@@ -206,8 +206,8 @@ describe('WSFE: importes y comprobantes', () => {
   });
 
   it('el pedido lleva las credenciales y el tipo de comprobante', () => {
-    const xml = sobreSolicitar({ cuit: '20446474937', ticket: { token: 'T', sign: 'S', venceMs: 0 } }, 3, 9, COMPROBANTE);
-    expect(xml).toContain('<ar:Token>T</ar:Token><ar:Sign>S</ar:Sign><ar:Cuit>20446474937</ar:Cuit>');
+    const xml = sobreSolicitar({ cuit: '20111111112', ticket: { token: 'T', sign: 'S', venceMs: 0 } }, 3, 9, COMPROBANTE);
+    expect(xml).toContain('<ar:Token>T</ar:Token><ar:Sign>S</ar:Sign><ar:Cuit>20111111112</ar:Cuit>');
     expect(xml).toContain('<ar:PtoVta>3</ar:PtoVta><ar:CbteTipo>11</ar:CbteTipo>');
     expect(xml).toContain('<ar:CbteDesde>9</ar:CbteDesde><ar:CbteHasta>9</ar:CbteHasta>');
   });
@@ -260,7 +260,7 @@ describe('ServicioArca', () => {
     const guardados: string[] = [];
     const { s } = servicio({ login: respuestaLogin, FECompUltimoAutorizado: ultimo(0), FECAESolicitar: aprobada(1) }, {}, { guardarTicket: (k: string) => guardados.push(k) });
     await s.autorizar(COMPROBANTE);
-    expect(guardados).toEqual(['homologacion-20446474937']);
+    expect(guardados).toEqual(['homologacion-20111111112']);
   });
 
   it('si el ticket venció (error 600), pide uno nuevo y reintenta una vez', async () => {
@@ -320,7 +320,7 @@ describe('ServicioArca', () => {
 describe('Reglas del emisor', () => {
   it('valida lo cargado en Ajustes', () => {
     expect(problemaDeConfig(CONFIG)).toBeNull();
-    expect(problemaDeConfig({ ...CONFIG, cuit: '20-44647493-7' })).toContain('11 números');
+    expect(problemaDeConfig({ ...CONFIG, cuit: '20-11111111-2' })).toContain('11 números');
     expect(problemaDeConfig({ ...CONFIG, puntoVenta: 0 })).toContain('punto de venta');
     expect(problemaDeConfig({ ...CONFIG, rutaCertificado: '' })).toContain('certificado');
   });
@@ -344,13 +344,13 @@ describe('Reglas del emisor', () => {
 describe('QR de la factura', () => {
   it('arma la dirección con los datos en base64', () => {
     const comprobante = leerRespuestaSolicitar(aprobada(8), 11, 1);
-    const url = urlQr({ comprobante, fecha: '2026-11-14', cuitEmisor: '20446474937', totalCentavos: 1250000, docTipo: 99, docNro: '0' });
+    const url = urlQr({ comprobante, fecha: '2026-11-14', cuitEmisor: '20111111112', totalCentavos: 1250000, docTipo: 99, docNro: '0' });
     expect(url.startsWith('https://www.afip.gob.ar/fe/qr/?p=')).toBe(true);
     const datos = JSON.parse(Buffer.from(url.split('?p=')[1]!, 'base64').toString());
     expect(datos).toEqual({
       ver: 1,
       fecha: '2026-11-14',
-      cuit: 20446474937,
+      cuit: 20111111112,
       ptoVta: 1,
       tipoCmp: 11,
       nroCmp: 8,
@@ -367,22 +367,22 @@ describe('QR de la factura', () => {
 
 describe('CUIT', () => {
   it('valida el dígito verificador', () => {
-    expect(cuitValido('20446474937')).toBe(true);
-    expect(cuitValido('20446474938')).toBe(false);
-    expect(cuitValido('2044647493')).toBe(false);
+    expect(cuitValido('20111111112')).toBe(true);
+    expect(cuitValido('20111111118')).toBe(false);
+    expect(cuitValido('2011111111')).toBe(false);
     expect(cuitValido('30-71234567-0'.replace(/\D/g, ''))).toBe(false);
   });
 
   it('acepta guiones y espacios al escribirlo', () => {
-    expect(soloNumeros(' 20-44647493-7 ')).toBe('20446474937');
-    expect(cuitConGuiones('20446474937')).toBe('20-44647493-7');
+    expect(soloNumeros(' 20-11111111-2 ')).toBe('20111111112');
+    expect(cuitConGuiones('20111111112')).toBe('20-11111111-2');
   });
 
   it('el esquema de Ajustes normaliza el CUIT y rechaza los inválidos', () => {
     const base = { activa: true, ambiente: 'homologacion', puntoVenta: 1, condicionIva: 'monotributo' } as const;
-    expect(esquemaArca.parse({ ...base, cuit: '20-44647493-7' }).cuit).toBe('20446474937');
-    expect(() => esquemaArca.parse({ ...base, cuit: '20-44647493-1' })).toThrow('El CUIT no es válido');
-    expect(() => esquemaArca.parse({ ...base, cuit: '20446474937', puntoVenta: 0 })).toThrow('punto de venta');
+    expect(esquemaArca.parse({ ...base, cuit: '20-11111111-2' }).cuit).toBe('20111111112');
+    expect(() => esquemaArca.parse({ ...base, cuit: '20-11111111-1' })).toThrow('El CUIT no es válido');
+    expect(() => esquemaArca.parse({ ...base, cuit: '20111111112', puntoVenta: 0 })).toThrow('punto de venta');
     expect(esquemaArca.parse({ ...base, cuit: '' }).cuit).toBe('');
   });
 });
@@ -445,8 +445,8 @@ describe('Archivos de ARCA y datos guardados', () => {
     const db = abrirBaseDeDatos(path.join(dir, 'x.db'));
     try {
       expect(obtenerDatosArca(db)).toEqual({ activa: false, ambiente: 'homologacion', cuit: '', puntoVenta: 1, condicionIva: 'monotributo', razonSocial: '', ingresosBrutos: '', inicioActividades: '' });
-      guardarDatosArca(db, { activa: true, ambiente: 'produccion', cuit: '20446474937', puntoVenta: 4, condicionIva: 'responsable_inscripto', razonSocial: 'Cardozo Sergio', ingresosBrutos: 'Exento', inicioActividades: '2024-03-01' });
-      expect(obtenerDatosArca(db)).toEqual({ activa: true, ambiente: 'produccion', cuit: '20446474937', puntoVenta: 4, condicionIva: 'responsable_inscripto', razonSocial: 'Cardozo Sergio', ingresosBrutos: 'Exento', inicioActividades: '2024-03-01' });
+      guardarDatosArca(db, { activa: true, ambiente: 'produccion', cuit: '20111111112', puntoVenta: 4, condicionIva: 'responsable_inscripto', razonSocial: 'Cardozo Sergio', ingresosBrutos: 'Exento', inicioActividades: '2024-03-01' });
+      expect(obtenerDatosArca(db)).toEqual({ activa: true, ambiente: 'produccion', cuit: '20111111112', puntoVenta: 4, condicionIva: 'responsable_inscripto', razonSocial: 'Cardozo Sergio', ingresosBrutos: 'Exento', inicioActividades: '2024-03-01' });
     } finally {
       cerrarBaseDeDatos();
     }

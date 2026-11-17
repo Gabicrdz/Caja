@@ -41,7 +41,7 @@ function pedido(cantidad = 1) {
 function arca(condicionIva: 'monotributo' | 'responsable_inscripto' = 'monotributo', ambiente: 'homologacion' | 'produccion' = 'homologacion'): Autorizador {
   let n = 0;
   return {
-    config: { activa: true, ambiente, cuit: '20446474937', puntoVenta: 1, condicionIva },
+    config: { activa: true, ambiente, cuit: '20111111112', puntoVenta: 1, condicionIva },
     async autorizar(d) {
       n += 1;
       return { resultado: 'A', tipo: d.tipo, puntoVenta: 1, numero: n, cae: '74123456789012', vencimientoCae: '2026-11-30', observaciones: [] };

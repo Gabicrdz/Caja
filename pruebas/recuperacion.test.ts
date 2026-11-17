@@ -43,7 +43,7 @@ function arca(opciones: { perderRespuestas?: number; consultaCaida?: boolean } =
   let aPerder = opciones.perderRespuestas ?? 0;
   const contador = { autorizar: 0, consultar: 0 };
   const a: Autorizador = {
-    config: { activa: true, ambiente: 'homologacion', cuit: '20446474937', puntoVenta: 1, condicionIva: 'monotributo' },
+    config: { activa: true, ambiente: 'homologacion', cuit: '20111111112', puntoVenta: 1, condicionIva: 'monotributo' },
     async autorizar(d: DatosComprobante) {
       contador.autorizar += 1;
       const numero = emitidos.filter((e) => e.tipo === d.tipo).length + 1;
@@ -196,7 +196,7 @@ describe('recuperar una nota de crédito que ARCA emitió y no se guardó', () =
 });
 
 describe('FECompConsultar (el mensaje y la respuesta)', () => {
-  const cred = { cuit: '20446474937', ticket: { token: 'T', sign: 'S', venceMs: 0 } };
+  const cred = { cuit: '20111111112', ticket: { token: 'T', sign: 'S', venceMs: 0 } };
 
   it('arma el pedido con el orden que pide ARCA', () => {
     const xml = sobreConsultar(cred, 1, 11, 7);
@@ -214,7 +214,7 @@ describe('FECompConsultar (el mensaje y la respuesta)', () => {
   });
 
   it('lee el comprobante asociado de una nota de crédito', () => {
-    const c = leerRespuestaConsultar(respuesta('<CbtesAsoc><CbteAsoc><Tipo>11</Tipo><PtoVta>1</PtoVta><Nro>5</Nro><Cuit>20446474937</Cuit><CbteFch>20261114</CbteFch></CbteAsoc></CbtesAsoc>'), 13, 1, 7)!;
+    const c = leerRespuestaConsultar(respuesta('<CbtesAsoc><CbteAsoc><Tipo>11</Tipo><PtoVta>1</PtoVta><Nro>5</Nro><Cuit>20111111112</Cuit><CbteFch>20261114</CbteFch></CbteAsoc></CbtesAsoc>'), 13, 1, 7)!;
     expect(c.asociado).toEqual({ tipo: 11, puntoVenta: 1, numero: 5 });
   });
 

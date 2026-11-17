@@ -43,7 +43,7 @@ function arcaFalso(opciones: { condicionIva?: 'monotributo' | 'responsable_inscr
   const llamadas: DatosComprobante[] = [];
   let ultimo = 0;
   const a: Autorizador = {
-    config: { activa: opciones.activa ?? true, ambiente: 'homologacion', cuit: '20446474937', puntoVenta: 1, condicionIva: opciones.condicionIva ?? 'monotributo' },
+    config: { activa: opciones.activa ?? true, ambiente: 'homologacion', cuit: '20111111112', puntoVenta: 1, condicionIva: opciones.condicionIva ?? 'monotributo' },
     async autorizar(datos) {
       llamadas.push(datos);
       if (opciones.demora) await new Promise((r) => setTimeout(r, opciones.demora));
@@ -122,7 +122,7 @@ describe('facturar un pedido', () => {
 describe('quién es el cliente y qué letra sale', () => {
   it('el monotributista siempre emite C, aunque el cliente tenga CUIT', async () => {
     const { a, llamadas } = arcaFalso();
-    const receptor = esquemaReceptor.parse({ tipo: 'cuit', numero: '20446474937', condicionIva: 1 });
+    const receptor = esquemaReceptor.parse({ tipo: 'cuit', numero: '20111111112', condicionIva: 1 });
     await facturarPedido(db, a, pedido().id, receptor, dueno.id, hoy);
     expect(llamadas[0]!.tipo).toBe(11);
   });
@@ -130,18 +130,18 @@ describe('quién es el cliente y qué letra sale', () => {
   it('el responsable inscripto emite B a consumidor final y A a otro inscripto', async () => {
     const { a, llamadas } = arcaFalso({ condicionIva: 'responsable_inscripto' });
     await facturarPedido(db, a, pedido().id, null, dueno.id, hoy);
-    await facturarPedido(db, a, pedido().id, { docTipo: 80, docNro: '20446474937', condicionIva: 1 }, dueno.id, hoy);
+    await facturarPedido(db, a, pedido().id, { docTipo: 80, docNro: '20111111112', condicionIva: 1 }, dueno.id, hoy);
     expect(llamadas.map((l) => l.tipo)).toEqual([6, 1]);
-    expect(llamadas[1]).toMatchObject({ docTipo: 80, docNro: '20446474937', condicionIvaReceptor: 1 });
+    expect(llamadas[1]).toMatchObject({ docTipo: 80, docNro: '20111111112', condicionIvaReceptor: 1 });
   });
 
   it('valida lo que se escribe del cliente', () => {
     expect(esquemaReceptor.parse({ tipo: 'consumidor_final', numero: 'lo que sea' })).toEqual({ docTipo: 99, docNro: '0', condicionIva: 5 });
     expect(esquemaReceptor.parse({ tipo: 'dni', numero: '30.123.456' })).toEqual({ docTipo: 96, docNro: '30123456', condicionIva: 5 });
     expect(() => esquemaReceptor.parse({ tipo: 'dni', numero: '123' })).toThrow('DNI');
-    expect(esquemaReceptor.parse({ tipo: 'cuit', numero: '20-44647493-7', condicionIva: 6 })).toEqual({ docTipo: 80, docNro: '20446474937', condicionIva: 6 });
-    expect(() => esquemaReceptor.parse({ tipo: 'cuit', numero: '20-44647493-1', condicionIva: 1 })).toThrow('CUIT del cliente');
-    expect(() => esquemaReceptor.parse({ tipo: 'cuit', numero: '20446474937', condicionIva: 99 })).toThrow('condición');
+    expect(esquemaReceptor.parse({ tipo: 'cuit', numero: '20-11111111-2', condicionIva: 6 })).toEqual({ docTipo: 80, docNro: '20111111112', condicionIva: 6 });
+    expect(() => esquemaReceptor.parse({ tipo: 'cuit', numero: '20-11111111-1', condicionIva: 1 })).toThrow('CUIT del cliente');
+    expect(() => esquemaReceptor.parse({ tipo: 'cuit', numero: '20111111112', condicionIva: 99 })).toThrow('condición');
   });
 });
 
@@ -208,7 +208,7 @@ describe('una factura no se borra', () => {
     const intento = () =>
       db.$client
         .prepare(
-          "INSERT INTO comprobantes (pedido_id, tipo, punto_venta, numero, fecha, total_centavos, doc_tipo, condicion_iva_receptor, cae, vencimiento_cae, ambiente, cuit_emisor) VALUES (1, 11, 1, 1, '2026-11-14', 100, 99, 5, 'x', '2026-11-24', 'homologacion', '20446474937')",
+          "INSERT INTO comprobantes (pedido_id, tipo, punto_venta, numero, fecha, total_centavos, doc_tipo, condicion_iva_receptor, cae, vencimiento_cae, ambiente, cuit_emisor) VALUES (1, 11, 1, 1, '2026-11-14', 100, 99, 5, 'x', '2026-11-24', 'homologacion', '20111111112')",
         )
         .run();
     expect(intento).toThrow('UNIQUE');
@@ -227,13 +227,13 @@ describe('anular con nota de crédito', () => {
   it('pide la nota de crédito a ARCA (misma letra, mismo importe, asociada) y recién ahí anula', async () => {
     const { a, llamadas } = arcaFalso({ condicionIva: 'responsable_inscripto' });
     const { id, totalCentavos } = pedido();
-    const receptor = { docTipo: 80, docNro: '20446474937', condicionIva: 1 };
+    const receptor = { docTipo: 80, docNro: '20111111112', condicionIva: 1 };
     const factura = await facturarPedido(db, a, id, receptor, dueno.id, hoy);
     const nota = await anularConNotaDeCredito(db, a, id, 'el cliente canceló', dueno.id, hoy);
     expect(llamadas[1]).toMatchObject({
       tipo: 3,
       docTipo: 80,
-      docNro: '20446474937',
+      docNro: '20111111112',
       condicionIvaReceptor: 1,
       totalCentavos,
       asociado: { tipo: 1, puntoVenta: 1, numero: factura.numero },
